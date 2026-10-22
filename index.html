@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FlowMath Uroflow Practice</title>
+<meta name="description" content="Post-lecture practice: classify 50 uroflowmetry curves and compare your reading with the group.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'%3E%3Cpath d='M2 27 C14 27 16 4 26 4 C36 4 42 27 58 27' fill='none' stroke='%231675C2' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Layout: one centred column (max 1080px); quiz = curve image on top, six curve-glyph answer tiles below */
+:root{
+  --bg:#EEF2F6; --surface:#FFFFFF; --ink:#0E2A47; --muted:#5A6B7E; --line:#D5DEE8; --accent:#1675C2; --accent-soft:#DCEBF8;
+  --ok:#1E8A55; --ok-soft:#DDF2E6; --bad:#C2412B; --bad-soft:#F9E1DB;
+  --c-bell:#2468B5; --c-tower:#C8472E; --c-plateau:#A67A08; --c-int:#1F8558; --c-stac:#6B43B8; --c-unk:#56677A;
+  --f-body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --r:10px; color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0C1825; --surface:#142436; --ink:#E4ECF4; --muted:#9AAABB; --line:#26384C; --accent:#5AAEF0; --accent-soft:#17324C;
+  --ok:#4CC587; --ok-soft:#173828; --bad:#F07A62; --bad-soft:#3E1F19; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:max(20px,env(safe-area-inset-top,0px)) max(48px,env(safe-area-inset-bottom,0px))}
+img{max-width:100%}
+[hidden]{display:none!important}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{text-wrap:balance;margin:0;line-height:1.2}
+h2{font-size:23px}
+h3{font-size:17px}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn{border:0;border-radius:8px;padding:11px 20px;font-weight:700;background:var(--accent);color:#fff}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+.btn:disabled{opacity:.5;cursor:wait}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.eyebrow{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.linkbtn{background:none;border:0;color:var(--accent);padding:0;font-size:14px;text-decoration:underline}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px}
+.note{background:var(--accent-soft);border-radius:8px;padding:10px 14px;font-size:15px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:14px;z-index:60;max-width:calc(100% - 32px)}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand h1{font-size:21px}
+.who{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--muted);flex-wrap:wrap}
+.who b{color:var(--ink)}
+.sync{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--line);color:var(--muted)}
+.sync.on{background:var(--ok-soft);color:var(--ok)}
+
+.reg{display:grid;grid-template-columns:1.1fr 1fr;gap:28px;align-items:start}
+.reg .intro{display:flex;flex-direction:column;gap:14px}
+.legend{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.legend span{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;color:#fff;font-weight:700;font-size:13px}
+.legend svg{width:48px;height:20px}
+form{display:flex;flex-direction:column;gap:13px}
+label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:15px}
+label .opt-tag{font-weight:400;color:var(--muted);font-size:13px}
+input{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:100%}
+.err{color:var(--bad);font-size:14px;min-height:1.2em}
+.consent{font-size:13px;color:var(--muted)}
+
+.mods{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.mod{display:flex;flex-direction:column;gap:8px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;color:var(--ink)}
+.mod:hover{border-color:var(--accent)}
+.mod .rng{font-family:var(--f-num);font-size:30px;font-weight:700;line-height:1;color:var(--accent)}
+.mod .meta{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;color:var(--muted);margin-top:auto;padding-top:6px}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:700;background:var(--accent-soft);color:var(--accent)}
+.pill.done{background:var(--ok-soft);color:var(--ok)}
+
+.qbar{display:flex;align-items:center;gap:16px}
+.qbar .prog{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.track{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.track i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.timer{position:relative;width:62px;height:62px;flex:none}
+.timer svg{transform:rotate(-90deg)}
+.timer span{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--f-num);font-weight:700;font-size:26px}
+.timer.low span{color:var(--bad)}
+.slide{position:relative;background:#fff;border-radius:var(--r);border:1px solid var(--line);overflow:hidden;cursor:zoom-in}
+.slide img{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;max-height:calc(100vh - 330px);min-height:180px}
+.slide .hint{position:absolute;right:8px;bottom:8px;font-size:12px;background:rgba(14,42,71,.75);color:#fff;padding:2px 8px;border-radius:6px}
+.opts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.opt{display:flex;align-items:center;gap:12px;border:0;border-radius:var(--r);padding:12px 14px;color:#fff;font-weight:700;font-size:18px;text-align:left;min-height:64px;transition:transform .12s,opacity .2s}
+.opt:hover{transform:translateY(-2px)}
+.opt svg{flex:none;width:64px;height:26px}
+.opt small{display:block;font-weight:400;font-size:13px;opacity:.9}
+.opt .k{margin-left:auto;font-family:var(--f-num);font-size:15px;opacity:.7}
+.opt.dim{opacity:.3}
+.opt.picked{outline:4px solid var(--ink);outline-offset:2px}
+.o-bell{background:var(--c-bell)}.o-tower{background:var(--c-tower)}.o-plateau{background:var(--c-plateau)}
+.o-int{background:var(--c-int)}.o-stac{background:var(--c-stac)}.o-unk{background:var(--c-unk)}
+
+.score{display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap}
+.score .big{font-family:var(--f-num);font-size:72px;font-weight:700;line-height:.9}
+.score .big small{font-size:32px;color:var(--muted)}
+.rlist{display:flex;flex-direction:column;gap:10px}
+.ritem{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.ritem>summary{display:grid;grid-template-columns:44px 120px 1fr auto;gap:14px;align-items:center;padding:10px 14px;cursor:pointer;list-style:none}
+.ritem>summary::-webkit-details-marker{display:none}
+.ritem .qn{font-family:var(--f-num);font-size:24px;font-weight:700;color:var(--muted)}
+.ritem .thumb{width:120px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;border:1px solid var(--line);background:#fff}
+.ritem .ans{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:15px}
+.mark{font-family:var(--f-num);font-weight:700;font-size:16px;padding:3px 10px;border-radius:6px;white-space:nowrap}
+.mark.y{background:var(--ok-soft);color:var(--ok)}.mark.n{background:var(--bad-soft);color:var(--bad)}
+.rbody{padding:0 14px 16px;display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.dist{display:flex;flex-direction:column;gap:6px;font-size:14px}
+.dist .drow{display:grid;grid-template-columns:100px 1fr 40px;gap:8px;align-items:center}
+.dist .bar{height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.dist .bar i{display:block;height:100%}
+.dist .drow.key{font-weight:700}
+
+.grid50{display:grid;grid-template-columns:repeat(10,1fr);gap:6px;max-width:620px}
+.cell{aspect-ratio:1;border-radius:6px;display:grid;place-items:center;font-family:var(--f-num);font-weight:700;font-size:16px;border:1px solid var(--line);background:var(--surface);color:var(--muted)}
+.cell.y{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.cell.n{background:var(--bad-soft);color:var(--bad);border-color:transparent}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+td.n{font-family:var(--f-num);font-size:16px;font-variant-numeric:tabular-nums}
+
+.zoom{position:fixed;inset:0;background:rgba(5,14,24,.92);z-index:50;display:grid;place-items:center;padding:12px;cursor:zoom-out}
+.zoom img{max-height:100%;max-width:100%;background:#fff;border-radius:6px}
+
+@media (max-width:760px){
+  .reg{grid-template-columns:1fr}
+  .opts{grid-template-columns:repeat(2,1fr)}
+  .opt{font-size:16px;padding:10px;gap:8px}.opt svg{width:44px}.opt .k{display:none}
+  .rbody{grid-template-columns:1fr}
+  .ritem>summary{grid-template-columns:34px 84px 1fr auto;gap:10px}
+  .ritem .thumb{width:84px}
+  .timer{width:52px;height:52px}
+  .grid50{grid-template-columns:repeat(5,1fr)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg width="46" height="30" viewBox="0 0 60 30" aria-hidden="true"><path d="M2 27 C14 27 16 4 26 4 C36 4 42 27 58 27" fill="none" stroke="var(--accent)" stroke-width="3.5" stroke-linecap="round"/><line x1="26" y1="4" x2="26" y2="27" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="2 2"/></svg>
+      <div><h1>FlowMath Uroflow Practice</h1><p class="muted small">Interpreting Uroflowmetry Curves With Mathematics · Stephen S. Yang, MD, PhD</p></div>
+    </div>
+    <div class="who" id="who" hidden></div>
+  </header>
+  <main id="app"></main>
+</div>
+
+<script>
+/* ===== Configuration ===== */
+const API = "";          // Google Apps Script web-app URL (…/exec). Leave empty to run offline.
+const TIME = 20;         // seconds per question
+
+/* ===== Answer options ===== */
+const OPTS = [
+  {id:"Bell",cls:"o-bell",c:"--c-bell",d:"M2 22 C14 22 16 3 26 3 C36 3 42 22 58 22"},
+  {id:"Tower",cls:"o-tower",c:"--c-tower",d:"M2 22 C17 22 21 1 26 1 C31 1 33 22 58 22"},
+  {id:"Plateau",cls:"o-plateau",c:"--c-plateau",d:"M2 22 C6 22 8 13 14 13 L46 13 C52 13 54 22 58 22"},
+  {id:"Interrupted",cls:"o-int",c:"--c-int",d:"M2 22 C6 22 8 7 13 7 C18 7 18 22 22 22 L28 22 C30 22 31 10 36 10 C41 10 41 22 44 22 L49 22 C51 22 51 14 53 14 C55 14 55 22 58 22"},
+  {id:"Staccato",cls:"o-stac",c:"--c-stac",d:"M2 22 L6 10 L10 16 L14 5 L18 14 L22 8 L26 15 L30 5 L34 13 L38 9 L42 16 L46 10 L50 17 L54 14 L58 22"},
+  {id:"Unclassifiable",cls:"o-unk",c:"--c-unk",sub:"Artifact / small volume",d:"M2 22 L10 22 L12 4 L13 22 L22 22 C28 22 30 17 34 17 C38 17 40 22 46 22 L58 22"}
+];
+const OPT = Object.fromEntries(OPTS.map(o=>[o.id,o]));
+const glyph=(o,w=3)=>`<svg viewBox="0 0 60 24" aria-hidden="true"><path d="${o.d}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+/* ===== Answer key: [accepted answers, expert reading] for questions 1–50 ===== */
+const B="Bell",T="Tower",P="Plateau",I="Interrupted",S="Staccato",U="Unclassifiable";
+const KEY = [
+ [[B],"Bell (4/4) · 1 DD"],[[S],"Staccato · ≥3 DD · BOD · EBC 390"],[[B],"Bell (3/4) · Tower (1/4) · 2 DD"],[[B],"Bell (4/4) · 2 DD · Rebound < 2 ml/s"],[[S],"Staccato · ≥3 DD · BOD · EBC 450"],
+ [[B],"Bell (4/4) · 1 DD"],[[B],"Bell (4/4)"],[[B],"Bell (3/4)"],[[B],"Bell (4/4) · 3 intervals, not interrupted"],[[B],"Bell (2/4) · BOD · EBC 420"],
+ [[B],"Bell (4/4)"],[[B],"Bell (4/4)"],[[I,P],"Interrupted? eMCR = 64% ≪ 85% · Plateau? (4/4)"],[[P],"Plateau (3/4)"],[[P],"Plateau (3/4) · High PVR"],
+ [[I],"Interrupted · eMCR = 64% < 85%"],[[P],"Plateau (3/4)"],[[P],"Plateau (3/4)"],[[P],"Plateau (3/4)"],[[B],"Bell (4/4) · BV = 337 < EBC (390) · High PVR, needs further study"],
+ [[I],"Interrupted · eMCR = 42.2% ≪ 85% · Recording > 60 s"],[[U],"Artifact · Small BV"],[[U],"Small BV"],[[U],"Small VV"],[[B],"Bell (4/4) · 1 DD"],
+ [[U],"Artifact"],[[B],"Bell (4/4)"],[[I],"Interrupted · eMCR = 51.7% ≪ 85%"],[[I],"Interrupted · eMCR = 4% ≪ 85% · High PVR > 30 ml / 8%"],[[I],"Interrupted · eMCR = 59% · High PVR > 30 ml"],
+ [[P],"Plateau (3/4) · High PVR > 30 ml / 8%"],[[U,B],"Artifact · Bell?"],[[S],"Staccato · 3 DD"],[[U],"Small BV (LABV 80 ml)"],[[B],"Bell (4/4)"],
+ [[P],"Plateau (4/4) · High PVR > 30 ml / 11%"],[[U],"Artifact · Small BV (LABV 70 ml)"],[[B],"Bell · 1 DD · BOD"],[[I,P],"Interrupted? eMCR = 64% ≪ 85% · Plateau? (4/4)"],[[B],"Bell (4/4) · eMCR = 90.7% > 85%"],
+ [[P],"Plateau (3/4)"],[[B],"Bell (4/4)"],[[B],"Bell (4/4) · Low BV"],[[I],"Interrupted · eMCR = 77% < 85%"],[[B],"Bell (4/4) · 1 DD · High PVR"],
+ [[B],"Bell (4/4) · 1 DD"],[[B],"Bell (4/4)"],[[P],"Plateau (4/4) · High PVR > 30 ml / 8%"],[[B],"Bell (4/4) · 1 DD"],[[U,P],"Artifact · ? BOD / calculation error due to artefact · Plateau (2/2) if artefact volume excluded"]
+];
+const SETS = [
+ {id:"A",from:1,to:10,title:"Set A",sub:"Adolescent uroflow curves",desc:"10 curves with age and sex only.",fb:"These curves were recorded from healthy adolescents."},
+ {id:"B",from:11,to:30,title:"Set B",sub:"Children with LUTS (1)",desc:"20 children with lower urinary tract symptoms, with clinical history and PVR."},
+ {id:"C",from:31,to:50,title:"Set C",sub:"Children with LUTS (2)",desc:"20 more children with LUTS, with clinical history and PVR."}
+];
+SETS.forEach(s=>s.n=s.to-s.from+1);
+const SET = Object.fromEntries(SETS.map(s=>[s.id,s]));
+const img=q=>`img/q${String(q).padStart(2,"0")}.jpg`;
+const isOk=(q,a)=>!!a&&KEY[q-1][0].includes(a);
+
+/* ===== State ===== */
+const LS="flowmath-practice-v1";
+let st={pid:null,profile:null,attempts:[],pending:[]};
+try{const r=localStorage.getItem(LS); if(r) st=Object.assign(st,JSON.parse(r));}catch(e){}
+const save=()=>{try{localStorage.setItem(LS,JSON.stringify(st))}catch(e){}};
+if(!st.pid){ st.pid=Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>b.toString(16).padStart(2,"0")).join(""); save(); }
+let stats=null, online=false, quiz=null;
+const app=document.getElementById("app");
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2600)}
+const attemptsFor=id=>st.attempts.filter(a=>a.set===id).sort((a,b)=>a.attempt-b.attempt);
+const firstOf=id=>attemptsFor(id)[0];
+
+/* ===== Backend ===== */
+async function apiGet(params){
+  if(!API) throw new Error("offline");
+  const r=await fetch(API+"?"+new URLSearchParams(params),{redirect:"follow"}); return r.json();
+}
+async function apiPost(body){
+  if(!API) throw new Error("offline");
+  const r=await fetch(API,{method:"POST",body:JSON.stringify(body),redirect:"follow"}); return r.json();
+}
+async function flush(){
+  if(!API||!st.profile) return;
+  try{
+    if(!st.registered){ const r=await apiPost({action:"register",pid:st.pid,profile:st.profile}); if(!r.ok) throw r; st.registered=true; save(); }
+    while(st.pending.length){
+      const p=st.pending[0];
+      const r=await apiPost({action:"submit",pid:st.pid,set:p.set,answers:p.answers,seconds:p.seconds});
+      if(!r.ok) throw r;
+      const a=st.attempts.find(x=>x.localId===p.localId); if(a){a.attempt=r.attempt;a.synced=true;}
+      st.pending.shift(); save();
+    }
+    online=true;
+  }catch(e){ online=false; console.warn("sync",e); }
+  setWho();
+}
+async function loadStats(){
+  if(!API) return null;
+  try{ const r=await apiGet({action:"stats"}); if(r.ok){stats=r; online=true;} }catch(e){}
+  return stats;
+}
+async function pullMine(){
+  if(!API||!st.profile) return;
+  try{
+    const r=await apiGet({action:"mine",pid:st.pid});
+    if(r.ok) mergeRemote(r.attempts);
+  }catch(e){}
+}
+function mergeRemote(list){
+  const pend=st.attempts.filter(a=>!a.synced);
+  st.attempts=list.map(a=>({set:a.set,attempt:a.attempt,answers:a.answers,seconds:a.seconds,score:a.score,at:a.at,synced:true})).concat(pend);
+  save();
+}
+
+/* ===== Header ===== */
+function setWho(){
+  const w=document.getElementById("who");
+  if(!st.profile){w.hidden=true;return}
+  w.hidden=false;
+  const p=st.profile;
+  w.innerHTML=`<span><b>${esc(p.name||p.hospital)}</b>${p.name?" · "+esc(p.hospital):""} · ${esc(p.specialty)} · ${esc(p.country)}</span>
+    ${API?`<span class="sync ${online&&!st.pending.length?"on":""}">${st.pending.length?st.pending.length+" not yet saved":online?"Saved":"Offline"}</span>`:""}
+    <button class="linkbtn" id="h-rec">My record</button><button class="linkbtn" id="h-edit">Edit details</button>`;
+  document.getElementById("h-rec").onclick=viewRecord;
+  document.getElementById("h-edit").onclick=()=>viewRegister(true);
+}
+
+/* ===== Registration ===== */
+function viewRegister(edit){
+  if(quiz) return;
+  const p=st.profile||{};
+  app.innerHTML=`<section class="reg">
+   <div class="intro">
+     <p class="eyebrow">Post-lecture practice</p>
+     <h2>Classify 50 uroflowmetry curves</h2>
+     <p>Each curve is shown for <b>${TIME} seconds</b>. Choose the pattern that best describes it. After each set you will see the expert reading and how other participants classified the same curve.</p>
+     <div class="legend">${OPTS.map(o=>`<span class="${o.cls}">${glyph(o)}${o.id==="Unclassifiable"?"Unclassifiable":o.id}</span>`).join("")}</div>
+     <p class="muted small">Set A: questions 1–10 · Set B: 11–30 · Set C: 31–50. Only your first attempt at each set is used in the group analysis; you may retake any set.</p>
+   </div>
+   <div class="card">
+     <form id="regf" novalidate>
+       <div><p class="eyebrow">${edit?"Edit details":"Before you start"}</p><h3>${edit?"Update your details":"Tell us about yourself"}</h3></div>
+       <label for="f-country">Country<input id="f-country" required autocomplete="country-name" value="${esc(p.country)}"></label>
+       <label for="f-spec">Specialty<input id="f-spec" required placeholder="e.g. Pediatric urology" value="${esc(p.specialty)}"></label>
+       <label for="f-hosp">Hospital / institution<input id="f-hosp" required autocomplete="organization" value="${esc(p.hospital)}"></label>
+       <label for="f-name">Name <span class="opt-tag">(optional)</span><input id="f-name" autocomplete="name" value="${esc(p.name)}"></label>
+       <label for="f-email">Email <span class="opt-tag">(optional)</span><input id="f-email" type="email" autocomplete="email" value="${esc(p.email)}"></label>
+       <p class="consent">Add your name and email if you want to open your record on another device. Your responses are collected for educational research on inter-observer variation in uroflowmetry interpretation.</p>
+       <p class="err" id="regerr"></p>
+       <div class="row"><button class="btn" type="submit">${edit?"Save":"Start practice"}</button>${edit?'<button class="btn ghost" type="button" id="cancel">Cancel</button>':''}</div>
+       ${edit?"":'<p class="small">Already practised on another device? <button class="linkbtn" type="button" id="torec">Retrieve my record</button></p>'}
+     </form>
+   </div></section>`;
+  if(edit) document.getElementById("cancel").onclick=viewHome; else document.getElementById("torec").onclick=viewRecover;
+  document.getElementById("regf").onsubmit=e=>{
+    e.preventDefault();
+    const v=id=>document.getElementById(id).value.trim();
+    const prof={country:v("f-country"),specialty:v("f-spec"),hospital:v("f-hosp"),name:v("f-name"),email:v("f-email")};
+    if(!prof.country||!prof.specialty||!prof.hospital){document.getElementById("regerr").textContent="Please fill in country, specialty and hospital.";return}
+    if(prof.email&&!/^\S+@\S+\.\S+$/.test(prof.email)){document.getElementById("regerr").textContent="That email address doesn't look complete.";return}
+    st.profile=prof; st.registered=false; save(); flush(); viewHome();
+  };
+}
+function viewRecover(){
+  app.innerHTML=`<section class="card" style="max-width:520px">
+    <form id="recf" novalidate>
+      <div><p class="eyebrow">Retrieve my record</p><h3>Enter the details you registered with</h3></div>
+      <p class="small muted">All three must match what you entered on your first device.</p>
+      <label for="r-email">Email<input id="r-email" type="email" required autocomplete="email"></label>
+      <label for="r-name">Name<input id="r-name" required autocomplete="name"></label>
+      <label for="r-hosp">Hospital / institution<input id="r-hosp" required autocomplete="organization"></label>
+      <p class="err" id="recerr"></p>
+      <div class="row"><button class="btn" type="submit" id="recbtn">Retrieve</button><button class="btn ghost" type="button" id="cancel">Back</button></div>
+    </form></section>`;
+  document.getElementById("cancel").onclick=()=>viewRegister(false);
+  document.getElementById("recf").onsubmit=async e=>{
+    e.preventDefault();
+    const v=id=>document.getElementById(id).value.trim(), err=document.getElementById("recerr"), btn=document.getElementById("recbtn");
+    if(!v("r-email")||!v("r-name")||!v("r-hosp")){err.textContent="Please fill in all three fields.";return}
+    if(!API){err.textContent="Records can't be retrieved right now. Please try again later.";return}
+    btn.disabled=true; err.textContent="";
+    try{
+      const r=await apiPost({action:"recover",email:v("r-email"),name:v("r-name"),hospital:v("r-hosp")});
+      if(!r.ok){err.textContent="No record matches these details. Check spelling, or register as a new participant.";btn.disabled=false;return}
+      st={pid:r.pid,profile:r.profile,registered:true,attempts:[],pending:[]}; mergeRemote(r.attempts); online=true;
+      toast("Record retrieved"); viewRecord();
+    }catch(x){err.textContent="Couldn't reach the server. Check your connection and try again.";btn.disabled=false;}
+  };
+}
+
+/* ===== Home ===== */
+function viewHome(){
+  if(quiz) return;
+  setWho(); window.scrollTo(0,0);
+  app.innerHTML=`<section style="display:flex;flex-direction:column;gap:14px">
+    <div class="row" style="justify-content:space-between;align-items:flex-end"><div><p class="eyebrow">50 questions in three sets</p><h2>Choose a set</h2></div>
+    <button class="btn ghost" id="torecord">My record</button></div>
+    <div class="mods">${SETS.map(s=>{
+      const f=firstOf(s.id), n=attemptsFor(s.id).length;
+      return `<button class="mod" data-set="${s.id}"><span class="rng">${s.from}–${s.to}</span>
+        <h3>${s.title} · ${s.sub}</h3><p class="small">${s.desc}</p><p class="muted small">${s.n} questions · ${TIME} s each</p>
+        <span class="meta">${f?`<span class="pill done">First attempt ${f.score}/${s.n}</span><span>${n>1?n+" attempts · ":""}Review →</span>`:`<span class="pill">Not started</span><span>Start →</span>`}</span></button>`;}).join("")}
+    </div></section>`;
+  app.querySelectorAll("[data-set]").forEach(b=>b.onclick=()=>{const id=b.dataset.set; firstOf(id)?viewReview(id):viewReady(id)});
+  document.getElementById("torecord").onclick=viewRecord;
+}
+const optBtn=(o,k)=>`<button class="opt ${o.cls}" data-o="${o.id}">${glyph(o)}<span>${o.id}${o.sub?`<small>${o.sub}</small>`:""}</span><span class="k">${k+1}</span></button>`;
+function viewReady(id){
+  const s=SET[id]; window.scrollTo(0,0);
+  for(let q=s.from;q<=s.to;q++){const im=new Image();im.src=img(q)}
+  const retake=attemptsFor(id).length>0;
+  app.innerHTML=`<section class="card" style="display:flex;flex-direction:column;gap:16px;align-items:flex-start">
+    <p class="eyebrow">${s.title} · Questions ${s.from}–${s.to}</p><h2>${s.sub}</h2>
+    <p>${s.n} questions, ${TIME} seconds each. Your choice moves you to the next curve; if time runs out the question is left blank. Tap a curve to enlarge it, or press keys 1–6 to answer.</p>
+    ${retake?'<p class="note">This is a retake. Your first attempt is the one used in the group analysis.</p>':""}
+    <div class="opts" style="width:100%;pointer-events:none" aria-hidden="true">${OPTS.map((o,k)=>optBtn(o,k)).join("")}</div>
+    <div class="row"><button class="btn" id="go">Start</button><button class="btn ghost" id="back">Back</button></div>
+  </section>`;
+  document.getElementById("go").onclick=()=>startQuiz(id);
+  document.getElementById("back").onclick=viewHome;
+}
+
+/* ===== Quiz ===== */
+function startQuiz(id){ quiz={id,i:0,answers:Array(SET[id].n).fill(null),seconds:Array(SET[id].n).fill(null),timer:null,t0:0,locked:false}; showQ(); }
+function showQ(){
+  const s=SET[quiz.id], i=quiz.i, q=s.from+i; window.scrollTo(0,0); quiz.locked=false;
+  app.innerHTML=`<section style="display:flex;flex-direction:column;gap:14px">
+    <div class="qbar">
+      <div class="prog"><p class="eyebrow">${s.title} · Question <span class="num" style="font-size:17px">${q}</span> of ${s.from}–${s.to}</p>
+        <div class="track"><i style="width:${i/s.n*100}%"></i></div></div>
+      <div class="timer" id="tm"><svg viewBox="0 0 62 62" width="100%" height="100%"><circle cx="31" cy="31" r="27" fill="none" stroke="var(--line)" stroke-width="6"/>
+        <circle id="ring" cx="31" cy="31" r="27" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="169.6" stroke-dashoffset="0"/></svg><span id="sec">${TIME}</span></div>
+    </div>
+    <div class="slide" id="qs"><img src="${img(q)}" alt="Uroflowmetry curve, question ${q}"><span class="hint">Tap to enlarge</span></div>
+    <div class="opts" id="opts">${OPTS.map((o,k)=>optBtn(o,k)).join("")}</div>
+  </section>`;
+  document.getElementById("qs").onclick=()=>zoom(img(q));
+  document.querySelectorAll("#opts .opt").forEach(b=>b.onclick=()=>answer(b.dataset.o));
+  quiz.t0=performance.now(); clearInterval(quiz.timer);
+  const ring=document.getElementById("ring"), sec=document.getElementById("sec"), tm=document.getElementById("tm");
+  quiz.timer=setInterval(()=>{
+    const left=Math.max(0,TIME-(performance.now()-quiz.t0)/1000);
+    ring.style.strokeDashoffset=String(169.6*(1-left/TIME)); sec.textContent=Math.ceil(left);
+    const low=left<=5; tm.classList.toggle("low",low); ring.style.stroke=low?"var(--bad)":"var(--accent)";
+    if(left<=0) answer(null);
+  },100);
+}
+function answer(o){
+  if(!quiz||quiz.locked) return;
+  quiz.locked=true; clearInterval(quiz.timer);
+  quiz.answers[quiz.i]=o; quiz.seconds[quiz.i]=Math.round((performance.now()-quiz.t0)/100)/10;
+  document.querySelectorAll("#opts .opt").forEach(b=>b.classList.add(b.dataset.o===o?"picked":"dim"));
+  const z=document.querySelector(".zoom"); if(z) z.remove();
+  setTimeout(()=>{ quiz.i++; quiz.i<SET[quiz.id].n?showQ():finishQuiz(); }, o?450:900);
+}
+async function finishQuiz(){
+  const id=quiz.id, s=SET[id];
+  const score=quiz.answers.reduce((a,x,i)=>a+(isOk(s.from+i,x)?1:0),0);
+  const localId=Date.now().toString(36);
+  const att={localId,set:id,attempt:attemptsFor(id).length+1,answers:quiz.answers,seconds:quiz.seconds,score,at:new Date().toISOString(),synced:false};
+  st.attempts.push(att); st.pending.push({localId,set:id,answers:att.answers,seconds:att.seconds}); save();
+  quiz=null;
+  app.innerHTML=`<section class="card"><p>Saving your answers…</p></section>`;
+  await flush();
+  viewReview(id, att);
+}
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){const z=document.querySelector(".zoom"); if(z) z.remove();}
+  if(!quiz||quiz.locked) return;
+  const k=parseInt(e.key,10); if(k>=1&&k<=6) answer(OPTS[k-1].id);
+});
+function zoom(src){ const d=document.createElement("div"); d.className="zoom"; d.innerHTML=`<img src="${src}" alt="">`; d.onclick=()=>d.remove(); document.body.appendChild(d); }
+
+/* ===== Review of one set ===== */
+async function viewReview(id, shown){
+  const s=SET[id], list=attemptsFor(id); window.scrollTo(0,0);
+  const att=shown?st.attempts.find(a=>a.localId===shown.localId)||shown:list[list.length-1];
+  app.innerHTML=`<section class="card"><p>Loading…</p></section>`;
+  await loadStats();
+  const first=list[0];
+  const dist=q=>{ if(!stats) return null; const d=stats.dist[q]||{}; const n=Object.values(d).reduce((a,b)=>a+b,0); return n?{d,n}:null; };
+  const groupPct=q=>{const x=dist(q); if(!x) return null; return Math.round(KEY[q-1][0].reduce((a,k)=>a+(x.d[k]||0),0)/x.n*100);};
+  const pct=att.score/s.n;
+  app.innerHTML=`<section style="display:flex;flex-direction:column;gap:16px">
+    <div class="card score">
+      <div><p class="eyebrow">${s.title} · Attempt ${att.attempt}</p><div class="big num">${att.score}<small> / ${s.n}</small></div></div>
+      <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:8px">
+        <p>${pct>=.8?"Your readings agree closely with the expert reading.":pct>=.5?"Most of your readings match. Open the questions below to see where they differ.":"Several readings differ from the expert reading. Open each question to compare."}</p>
+        ${s.fb?`<p class="note">${s.fb}</p>`:""}
+        ${first&&att.attempt>1?`<p class="small muted">First attempt: ${first.score}/${s.n} (used in the group analysis).</p>`:""}
+        <p class="muted small">${stats&&stats.n&&stats.n[id]?`Group comparison is based on ${stats.n[id]} participants' first attempts.`:"Group comparison will appear once results are available."}</p>
+      </div>
+      <div class="row"><button class="btn" id="home">All sets</button><button class="btn ghost" id="redo">Retake set</button></div>
+    </div>
+    <div class="rlist">${Array.from({length:s.n},(_,i)=>{
+      const q=s.from+i, k=KEY[q-1], a=att.answers[i], ok=isOk(q,a), d=dist(q), gp=groupPct(q);
+      return `<details class="ritem"><summary>
+        <span class="qn">${q}</span><img class="thumb" src="${img(q)}" alt="" loading="lazy">
+        <span class="ans"><span>Your answer: <b>${a||"No answer"}</b></span><span class="muted">Expert: ${esc(k[1])}</span>${gp!=null?`<span class="muted small">${gp}% of participants answered correctly</span>`:""}</span>
+        <span class="mark ${ok?"y":"n"}">${ok?"✓ Correct":"✗"}</span></summary>
+        <div class="rbody">
+          <div class="slide" data-z="${img(q)}"><img src="${img(q)}" alt="Question ${q}" loading="lazy"><span class="hint">Tap to enlarge</span></div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div><p class="eyebrow">Accepted answer</p><p><b>${k[0].join(" or ")}</b></p></div>
+            <div><p class="eyebrow">Expert reading</p><p>${esc(k[1])}</p></div>
+            ${d?`<div class="dist"><p class="eyebrow">Participants' first answers (n = ${d.n})</p>${OPTS.map(o=>o.id).concat(["none"]).map(x=>{
+              const v=d.d[x]||0; if(!v&&x==="none") return "";
+              return `<div class="drow ${k[0].includes(x)?"key":""}"><span>${x==="none"?"No answer":x==="Unclassifiable"?"Unclassif.":x}</span><span class="bar"><i style="width:${v/d.n*100}%;background:${OPT[x]?`var(${OPT[x].c})`:"var(--muted)"}"></i></span><span class="num">${Math.round(v/d.n*100)}%</span></div>`;}).join("")}</div>`:""}
+          </div>
+        </div></details>`;}).join("")}
+    </div></section>`;
+  document.getElementById("home").onclick=viewHome;
+  document.getElementById("redo").onclick=()=>viewReady(id);
+  app.querySelectorAll("[data-z]").forEach(el=>el.onclick=()=>zoom(el.dataset.z));
+  if(shown) toast(online&&!st.pending.length?"Answers saved":API?"Answers kept on this device; they will be sent when you're back online":"Answers kept on this device");
+}
+
+/* ===== My record ===== */
+async function viewRecord(){
+  if(quiz) return;
+  window.scrollTo(0,0);
+  app.innerHTML=`<section class="card"><p>Loading your record…</p></section>`;
+  await Promise.all([pullMine(),loadStats()]); setWho();
+  const p=st.profile||{};
+  const firstTotal=SETS.reduce((a,s)=>a+(firstOf(s.id)?.score||0),0), done=SETS.filter(s=>firstOf(s.id)).length;
+  const cellFor=q=>{const s=SETS.find(x=>q>=x.from&&q<=x.to), f=firstOf(s.id); if(!f) return `<span class="cell" title="Not attempted">${q}</span>`;
+    const a=f.answers[q-s.from]; return `<span class="cell ${isOk(q,a)?"y":"n"}" title="Q${q}: ${a||"No answer"}">${q}</span>`;};
+  const groupAvg=s=>{ if(!stats||!stats.n||!stats.n[s.id]) return null; let c=0; for(let q=s.from;q<=s.to;q++){const d=stats.dist[q]||{}; c+=KEY[q-1][0].reduce((a,k)=>a+(d[k]||0),0);} return c/stats.n[s.id]; };
+  app.innerHTML=`<section style="display:flex;flex-direction:column;gap:16px">
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><p class="eyebrow">My record</p><h2>${esc(p.name||"Your results")}</h2><p class="muted small">${esc(p.hospital)} · ${esc(p.specialty)} · ${esc(p.country)}${p.email?" · "+esc(p.email):""}</p></div>
+      <button class="btn" id="home">All sets</button></div>
+    <div class="card score"><div><p class="eyebrow">First attempts</p><div class="big num">${firstTotal}<small> / ${SETS.filter(s=>firstOf(s.id)).reduce((a,s)=>a+s.n,0)||50}</small></div></div>
+      <p style="flex:1;min-width:220px">${done<3?`${done} of 3 sets completed.`:"All three sets completed."} Green squares are questions you answered correctly on your first attempt.</p></div>
+    <div class="grid50">${Array.from({length:50},(_,i)=>cellFor(i+1)).join("")}</div>
+    <div class="tablewrap"><table><thead><tr><th>Set</th><th>Questions</th><th>First attempt</th><th>Latest</th><th>Attempts</th><th>Group average</th><th></th></tr></thead><tbody>
+      ${SETS.map(s=>{const l=attemptsFor(s.id), f=l[0], last=l[l.length-1], g=groupAvg(s);
+        return `<tr><td><b>${s.title}</b> · ${s.sub}</td><td class="n">${s.from}–${s.to}</td><td class="n">${f?f.score+" / "+s.n:"—"}</td><td class="n">${last?last.score+" / "+s.n:"—"}</td><td class="n">${l.length}</td><td class="n">${g!=null?g.toFixed(1)+" / "+s.n:"—"}</td>
+        <td>${f?`<button class="linkbtn" data-rev="${s.id}">Review</button>`:`<button class="linkbtn" data-go="${s.id}">Start</button>`}</td></tr>`;}).join("")}
+    </tbody></table></div>
+  </section>`;
+  document.getElementById("home").onclick=viewHome;
+  app.querySelectorAll("[data-rev]").forEach(b=>b.onclick=()=>viewReview(b.dataset.rev));
+  app.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>viewReady(b.dataset.go));
+}
+
+/* ===== Boot ===== */
+if(st.profile){ viewHome(); flush(); } else viewRegister(false);
+</script>
+</body>
+</html>
