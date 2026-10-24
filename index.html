@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>FlowMath Uroflow Practice</title>
-<meta name="description" content="Post-lecture practice: classify 50 uroflowmetry curves and compare your reading with the group.">
+<meta name="description" content="Post-lecture practice: classify 60 uroflowmetry curves and compare your reading with the group.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'%3E%3Cpath d='M2 27 C14 27 16 4 26 4 C36 4 42 27 58 27' fill='none' stroke='%231675C2' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap">
@@ -210,7 +210,7 @@ body.quizmode .brand svg{width:34px;height:22px}
 /* ===== Configuration ===== */
 const API = "https://script.google.com/macros/s/AKfycby2GYQ7isR-obyR2lbirHXNvB3c2ZbyX3j6tLxEHloxMll2S7U9vxq23egojTD-YBI_qA/exec";          // Google Apps Script web-app URL (…/exec). Leave empty to run offline.
 /* Purpose text shown on the welcome and home pages (replace with the final wording) */
-const PURPOSE = `This website accompanies the lecture <i>Interpreting Uroflowmetry Curves With Mathematics</i>. It lets you revisit 50 uroflowmetry curves at your own pace, compare your reading with the expert reading, and see how other clinicians classified the same curves. Your responses help us understand how curve interpretation varies between observers, specialties and countries.`;
+const PURPOSE = `This website accompanies the lecture interpreting uroflowmetry curves in pediatric population. It lets you revisit 60 uroflowmetry curves at your own pace, compare your reading with the expert reading. Your responses help us understand how curve interpretation varies between observers, specialties and countries.`;
 
 /* ===== Answer options ===== */
 const OPTS = [
@@ -224,9 +224,11 @@ const OPTS = [
 const OPT = Object.fromEntries(OPTS.map(o=>[o.id,o]));
 const glyph=(o,w=3)=>`<svg viewBox="0 0 60 24" aria-hidden="true"><path d="${o.d}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-/* ===== Answer key: [accepted answers, expert reading] for questions 1–50 ===== */
+/* ===== Answer key: [accepted answers, expert reading] for questions 1–60 ===== */
 const B="Bell",T="Tower",P="Plateau",I="Interrupted",S="Staccato",U="Unclassifiable";
 const KEY = [
+ [[B],"Bell (4/4)"],[[S],"Staccato · ≥3 DD · BOD · EBC 390"],[[U],"Artifact"],[[B,T],"Bell (2/4) · Tower (2/4)"],[[B],"Bell (2/4) · BOD · EBC 450"],
+ [[B],"Bell (4/4) · One spike"],[[B],"Bell (2/4) · 1 DD · BOD · EBC 450"],[[B],"Bell (4/4)"],[[S],"Staccato · ≥3 DD"],[[B],"Interrupted? eMCR ≈ 86% → Likely Bell (4/4)"],
  [[B],"Bell (4/4) · 1 DD"],[[S],"Staccato · ≥3 DD · BOD · EBC 390"],[[B],"Bell (3/4) · Tower (1/4) · 2 DD"],[[B],"Bell (4/4) · 2 DD · Rebound < 2 ml/s"],[[S],"Staccato · ≥3 DD · BOD · EBC 450"],
  [[B],"Bell (4/4) · 1 DD"],[[B],"Bell (4/4)"],[[B],"Bell (3/4)"],[[B],"Bell (4/4) · 3 intervals, not interrupted"],[[B],"Bell (2/4) · BOD · EBC 420"],
  [[B],"Bell (4/4)"],[[B],"Bell (4/4)"],[[I,P],"Interrupted? eMCR = 64% ≪ 85% · Plateau? (4/4)"],[[P],"Plateau (3/4)"],[[P],"Plateau (3/4) · High PVR"],
@@ -239,9 +241,10 @@ const KEY = [
  [[B],"Bell (4/4) · 1 DD"],[[B],"Bell (4/4)"],[[P],"Plateau (4/4) · High PVR > 30 ml / 8%"],[[B],"Bell (4/4) · 1 DD"],[[U,P],"Artifact · ? BOD / calculation error due to artefact · Plateau (2/2) if artefact volume excluded"]
 ];
 const SETS = [
- {id:"A",from:1,to:10,title:"Set A",sub:"Adolescent uroflow curves",desc:"10 curves with age and sex only.",fb:"These curves were recorded from healthy adolescents."},
- {id:"B",from:11,to:30,title:"Set B",sub:"Children with LUTS (1)",desc:"20 children with lower urinary tract symptoms, with clinical history and PVR."},
- {id:"C",from:31,to:50,title:"Set C",sub:"Children with LUTS (2)",desc:"20 more children with LUTS, with clinical history and PVR."}
+ {id:"A",from:1,to:10,title:"Set A",sub:"Adolescent uroflow curves (1)",desc:"10 curves with age and sex only.",fb:"These curves were recorded from healthy adolescents."},
+ {id:"B",from:11,to:20,title:"Set B",sub:"Adolescent uroflow curves (2)",desc:"10 more curves with age and sex only.",fb:"These curves were recorded from healthy adolescents."},
+ {id:"C",from:21,to:40,title:"Set C",sub:"Children with LUTS (1)",desc:"20 children with lower urinary tract symptoms, with clinical history and PVR."},
+ {id:"D",from:41,to:60,title:"Set D",sub:"Children with LUTS (2)",desc:"20 more children with LUTS, with clinical history and PVR."}
 ];
 SETS.forEach(s=>s.n=s.to-s.from+1);
 const SET = Object.fromEntries(SETS.map(s=>[s.id,s]));
@@ -249,7 +252,7 @@ const img=q=>`img/q${String(q).padStart(2,"0")}.jpg`;
 const isOk=(q,a)=>!!a&&KEY[q-1][0].includes(a);
 
 /* ===== State ===== */
-const LS="flowmath-practice-v1";
+const LS="flowmath-practice-v2";
 let st={pid:null,profile:null,attempts:[],pending:[]};
 try{const r=localStorage.getItem(LS); if(r) st=Object.assign(st,JSON.parse(r));}catch(e){}
 const save=()=>{try{localStorage.setItem(LS,JSON.stringify(st))}catch(e){}};
@@ -324,11 +327,11 @@ function viewRegister(edit){
   app.innerHTML=`<section class="reg">
    <div class="intro">
      <p class="eyebrow">Post-lecture practice</p>
-     <h2>Classify 50 uroflowmetry curves</h2>
+     <h2>Classify 60 uroflowmetry curves</h2>
      <div class="purpose"><p class="eyebrow">About this website</p><p>${PURPOSE}</p></div>
      <p>For each curve, choose the pattern that best describes it. Take as long as you need, move back and forth between questions, and review all your answers before you submit. After each set you will see the expert reading and how other participants classified the same curve.</p>
      <div class="legend">${OPTS.map(o=>`<span class="${o.cls}">${glyph(o)}${o.id==="Unclassifiable"?"Unclassifiable":o.id}</span>`).join("")}</div>
-     <p class="muted small">Set A: questions 1–10 · Set B: 11–30 · Set C: 31–50. Only your first attempt at each set is used in the group analysis; you may retake any set.</p>
+     <p class="muted small">Set A: questions 1–10 · Set B: 11–20 · Set C: 21–40 · Set D: 41–60. Only your first attempt at each set is used in the group analysis; you may retake any set.</p>
    </div>
    <div class="card">
      <form id="regf" novalidate>
@@ -389,7 +392,7 @@ function viewHome(){
   setWho(); window.scrollTo(0,0);
   app.innerHTML=`<section style="display:flex;flex-direction:column;gap:14px">
     <details class="purpose card"><summary class="eyebrow">About this website</summary><p style="margin-top:8px">${PURPOSE}</p></details>
-    <div class="row" style="justify-content:space-between;align-items:flex-end"><div><p class="eyebrow">50 questions in three sets</p><h2>Choose a set</h2></div>
+    <div class="row" style="justify-content:space-between;align-items:flex-end"><div><p class="eyebrow">60 questions in four sets</p><h2>Choose a set</h2></div>
     <button class="btn ghost" id="torecord">My record</button></div>
     <div class="mods">${SETS.map(s=>{
       const f=firstOf(s.id), n=attemptsFor(s.id).length;
@@ -571,9 +574,9 @@ async function viewRecord(){
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><p class="eyebrow">My record</p><h2>${esc(p.name||"Your results")}</h2><p class="muted small">${esc(p.hospital)} · ${esc(p.specialty)} · ${esc(p.country)}${p.email?" · "+esc(p.email):""}</p></div>
       <button class="btn" id="home">All sets</button></div>
-    <div class="card score"><div><p class="eyebrow">First attempts</p><div class="big num">${firstTotal}<small> / ${SETS.filter(s=>firstOf(s.id)).reduce((a,s)=>a+s.n,0)||50}</small></div></div>
-      <p style="flex:1;min-width:220px">${done<3?`${done} of 3 sets completed.`:"All three sets completed."} Green squares are questions you answered correctly on your first attempt.</p></div>
-    <div class="grid50">${Array.from({length:50},(_,i)=>cellFor(i+1)).join("")}</div>
+    <div class="card score"><div><p class="eyebrow">First attempts</p><div class="big num">${firstTotal}<small> / ${SETS.filter(s=>firstOf(s.id)).reduce((a,s)=>a+s.n,0)||60}</small></div></div>
+      <p style="flex:1;min-width:220px">${done<SETS.length?`${done} of ${SETS.length} sets completed.`:"All four sets completed."} Green squares are questions you answered correctly on your first attempt.</p></div>
+    <div class="grid50">${Array.from({length:60},(_,i)=>cellFor(i+1)).join("")}</div>
     <div class="tablewrap"><table><thead><tr><th>Set</th><th>Questions</th><th>First attempt</th><th>Latest</th><th>Attempts</th><th>Group average</th><th></th></tr></thead><tbody>
       ${SETS.map(s=>{const l=attemptsFor(s.id), f=l[0], last=l[l.length-1], g=groupAvg(s);
         return `<tr><td><b>${s.title}</b> · ${s.sub}</td><td class="n">${s.from}–${s.to}</td><td class="n">${f?f.score+" / "+s.n:"—"}</td><td class="n">${last?last.score+" / "+s.n:"—"}</td><td class="n">${l.length}</td><td class="n">${g!=null?g.toFixed(1)+" / "+s.n:"—"}</td>
