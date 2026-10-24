@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>FlowMath Results Dashboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Layout: filter sidebar on the left, results (summary → per-question table → participants) on the right */
+:root{
+  --bg:#EEF2F6; --surface:#FFFFFF; --ink:#0E2A47; --muted:#5A6B7E; --line:#D5DEE8; --accent:#1675C2; --accent-soft:#DCEBF8;
+  --ok:#1E8A55; --ok-soft:#DDF2E6; --bad:#C2412B; --bad-soft:#F9E1DB; --warn:#A67A08;
+  --c-Bell:#2468B5; --c-Tower:#C8472E; --c-Plateau:#A67A08; --c-Interrupted:#1F8558; --c-Staccato:#6B43B8; --c-Unclassifiable:#56677A; --c-none:#C3CDD8;
+  --f:"Source Sans 3","Segoe UI",system-ui,-apple-system,sans-serif; --fn:"Barlow Condensed","Arial Narrow",system-ui,sans-serif; --r:10px;
+}
+@media (prefers-color-scheme:dark){:root{--bg:#0C1825;--surface:#142436;--ink:#E4ECF4;--muted:#9AAABB;--line:#26384C;--accent:#5AAEF0;--accent-soft:#17324C;--ok:#4CC587;--ok-soft:#173828;--bad:#F07A62;--bad-soft:#3E1F19;--c-none:#3A4B5E;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);font-size:15px;line-height:1.5}
+button,select,input{font:inherit;color:inherit}
+h1,h2,h3{margin:0;line-height:1.2}
+.num{font-family:var(--fn);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .small{font-size:13px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;background:var(--surface);border-bottom:1px solid var(--line)}
+.top h1{font-size:20px}
+.btn{border:1.5px solid var(--accent);background:transparent;color:var(--accent);border-radius:8px;padding:6px 14px;font-weight:700;cursor:pointer}
+.btn.solid{background:var(--accent);color:#fff}
+.layout{display:grid;grid-template-columns:290px minmax(0,1fr);gap:18px;padding:18px 20px;align-items:start}
+aside{position:sticky;top:12px;display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 24px);overflow:auto;padding-right:2px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;border:0;background:transparent;padding:6px 4px;cursor:pointer;font-weight:600;font-size:14px}
+.seg button.on{background:var(--accent);color:#fff}
+.flist{display:flex;flex-direction:column;gap:6px}
+.flist .head{display:flex;justify-content:space-between;align-items:center}
+.flist input[type=search]{width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.flist .opts{max-height:190px;overflow:auto;display:flex;flex-direction:column;gap:1px;border:1px solid var(--line);border-radius:6px;padding:4px}
+.flist label{display:flex;align-items:center;gap:6px;font-size:14px;padding:2px 4px;border-radius:4px;cursor:pointer}
+.flist label:hover{background:var(--accent-soft)}
+.flist label span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.flist label em{font-style:normal;color:var(--muted);font-size:12px}
+.linkbtn{background:none;border:0;color:var(--accent);padding:0;font-size:13px;cursor:pointer;text-decoration:underline}
+main{display:flex;flex-direction:column;gap:18px;min-width:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.kpi .v{font-family:var(--fn);font-size:38px;font-weight:700;line-height:1}
+.kpi .v small{font-size:18px;color:var(--muted)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:1px 10px;font-size:13px;font-weight:600}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;background:var(--surface);position:sticky;top:0}
+td.n{font-family:var(--fn);font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.q{cursor:pointer} tr.q:hover td{background:var(--accent-soft)}
+tr.q.open td{background:var(--accent-soft)}
+.thumb{width:92px;height:52px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:4px;display:block}
+.stack{display:flex;height:16px;border-radius:4px;overflow:hidden;background:var(--line);min-width:220px}
+.stack i{display:block;height:100%}
+.pct{display:flex;align-items:center;gap:8px}
+.pct .bar{width:70px;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.pct .bar i{display:block;height:100%}
+.ans{font-weight:700;white-space:nowrap}
+.detail td{padding:14px;background:var(--bg)}
+.dgrid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}
+.dgrid img{width:100%;background:#fff;border:1px solid var(--line);border-radius:6px}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.loading{padding:60px;text-align:center;color:var(--muted)}
+.err{color:var(--bad)}
+@media (max-width:900px){.layout{grid-template-columns:1fr}aside{position:static;max-height:none}.dgrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div><h1>FlowMath Results Dashboard</h1><p class="small muted">Password protected · live from the FlowMath Practice Results sheet · <span id="loaded">locked</span></p></div>
+  <div style="display:flex;gap:8px"><button class="btn solid" id="refresh" hidden>Refresh data</button><button class="btn" id="lock" hidden>Lock</button></div>
+</header>
+<div id="root"><p class="loading">Loading responses…</p></div>
+
+<script>
+const OPTS=["Bell","Tower","Plateau","Interrupted","Staccato","Unclassifiable"];
+const B="Bell",T="Tower",P="Plateau",I="Interrupted",S="Staccato",U="Unclassifiable";
+const KEY=[
+ [[B],"Bell (4/4)"],[[S],"Staccato · ≥3 DD · BOD · EBC 390"],[[U],"Artifact"],[[B,T],"Bell (2/4) · Tower (2/4)"],[[B],"Bell (2/4) · BOD · EBC 450"],
+ [[B],"Bell (4/4) · One spike"],[[B],"Bell (2/4) · 1 DD · BOD · EBC 450"],[[B],"Bell (4/4)"],[[S],"Staccato · ≥3 DD"],[[B],"Interrupted? eMCR ≈ 86% → Likely Bell (4/4)"],
+ [[B],"Bell (4/4) · 1 DD"],[[S],"Staccato · ≥3 DD · BOD · EBC 390"],[[B],"Bell (3/4) · Tower (1/4) · 2 DD"],[[B],"Bell (4/4) · 2 DD · Rebound < 2 ml/s"],[[S],"Staccato · ≥3 DD · BOD · EBC 450"],
+ [[B],"Bell (4/4) · 1 DD"],[[B],"Bell (4/4)"],[[B],"Bell (3/4)"],[[B],"Bell (4/4) · 3 intervals, not interrupted"],[[B],"Bell (2/4) · BOD · EBC 420"],
+ [[B],"Bell (4/4)"],[[B],"Bell (4/4)"],[[I,P],"Interrupted? eMCR = 64% ≪ 85% · Plateau? (4/4)"],[[P],"Plateau (3/4)"],[[P],"Plateau (3/4) · High PVR"],
+ [[I],"Interrupted · eMCR = 64% < 85%"],[[P],"Plateau (3/4)"],[[P],"Plateau (3/4)"],[[P],"Plateau (3/4)"],[[B],"Bell (4/4) · BV = 337 < EBC (390) · High PVR, needs further study"],
+ [[I],"Interrupted · eMCR = 42.2% ≪ 85% · Recording > 60 s"],[[U],"Artifact · Small BV"],[[U],"Small BV"],[[U],"Small VV"],[[B],"Bell (4/4) · 1 DD"],
+ [[U],"Artifact"],[[B],"Bell (4/4)"],[[I],"Interrupted · eMCR = 51.7% ≪ 85%"],[[I],"Interrupted · eMCR = 4% ≪ 85% · High PVR > 30 ml / 8%"],[[I],"Interrupted · eMCR = 59% · High PVR > 30 ml"],
+ [[P],"Plateau (3/4) · High PVR > 30 ml / 8%"],[[U,B],"Artifact · Bell?"],[[S],"Staccato · 3 DD"],[[U],"Small BV (LABV 80 ml)"],[[B],"Bell (4/4)"],
+ [[P],"Plateau (4/4) · High PVR > 30 ml / 11%"],[[U],"Artifact · Small BV (LABV 70 ml)"],[[B],"Bell · 1 DD · BOD"],[[I,P],"Interrupted? eMCR = 64% ≪ 85% · Plateau? (4/4)"],[[B],"Bell (4/4) · eMCR = 90.7% > 85%"],
+ [[P],"Plateau (3/4)"],[[B],"Bell (4/4)"],[[B],"Bell (4/4) · Low BV"],[[I],"Interrupted · eMCR = 77% < 85%"],[[B],"Bell (4/4) · 1 DD · High PVR"],
+ [[B],"Bell (4/4) · 1 DD"],[[B],"Bell (4/4)"],[[P],"Plateau (4/4) · High PVR > 30 ml / 8%"],[[B],"Bell (4/4) · 1 DD"],[[U,P],"Artifact · ? BOD / calculation error due to artefact · Plateau (2/2) if artefact volume excluded"]
+];
+const SETS={A:[1,10],B:[11,20],C:[21,40],D:[41,60]};
+const API="https://script.google.com/macros/s/AKfycby2GYQ7isR-obyR2lbirHXNvB3c2ZbyX3j6tLxEHloxMll2S7U9vxq23egojTD-YBI_qA/exec";
+const IMG=q=>`img/q${String(q).padStart(2,"0")}.jpg`;
+const setOf=q=>q<=10?"A":q<=20?"B":q<=40?"C":"D";
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm=s=>String(s||"").trim().replace(/\s+/g," ").toLowerCase();
+
+let DATA=null;
+const F={country:new Set(),specialty:new Set(),hospital:new Set(),set:"all",basis:"first",sort:"q",open:null,breakdown:"specialty",search:{country:"",specialty:"",hospital:""}};
+let LABEL={country:{},specialty:{},hospital:{}};   // normalised key → display spelling
+
+function showMsg(html,cls){ document.getElementById("root").innerHTML=`<div class="loading ${cls||""}">${html}</div>`; }
+const PWKEY="flowmath-dash-pw";
+let PW=""; try{PW=localStorage.getItem(PWKEY)||"";}catch(e){}
+function gate(msg){
+  document.getElementById("refresh").hidden=true; document.getElementById("lock").hidden=true;
+  document.getElementById("loaded").textContent="locked";
+  document.getElementById("root").innerHTML=`<div class="card" style="max-width:380px;margin:60px auto;display:flex;flex-direction:column;gap:12px">
+    <h2 style="font-size:19px">Enter dashboard password</h2>
+    <form id="pwf" style="display:flex;flex-direction:column;gap:10px">
+      <input id="pw" type="password" autocomplete="current-password" style="padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--bg)" placeholder="Password">
+      <label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="remember" checked> Remember on this device</label>
+      <p class="small err" id="pwerr">${msg||""}</p>
+      <button class="btn solid" type="submit">Open dashboard</button>
+    </form></div>`;
+  document.getElementById("pw").focus();
+  document.getElementById("pwf").onsubmit=e=>{e.preventDefault(); PW=document.getElementById("pw").value; const rem=document.getElementById("remember").checked;
+    try{ rem?localStorage.setItem(PWKEY,PW):localStorage.removeItem(PWKEY);}catch(x){} load();};
+}
+async function load(){
+  if(window.MOCK){ receive(window.MOCK); return; }
+  if(!PW){ gate(); return; }
+  document.getElementById("loaded").textContent="loading…";
+  if(!DATA) showMsg("Loading responses…");
+  try{
+    const r=await fetch(API,{method:"POST",body:JSON.stringify({action:"dashboard",password:PW})}).then(x=>x.json());
+    if(!r.ok){
+      if(r.error==="wrong_password"){ try{localStorage.removeItem(PWKEY);}catch(e){} PW=""; DATA=null; gate("That password is not correct."); return; }
+      if(r.error==="password_not_set"){ showMsg("The dashboard password has not been set yet in the Apps Script backend (DASHBOARD_PASSWORD).","err"); return; }
+      showMsg("Couldn't read the results: "+esc(r.error),"err"); return;
+    }
+    receive(r);
+    document.getElementById("refresh").hidden=false; document.getElementById("lock").hidden=false;
+  }catch(e){ showMsg("Couldn't reach the results server. Check your connection and press Refresh data.","err"); document.getElementById("refresh").hidden=false; }
+}
+function receive(raw){
+    let d;
+  try{ d=typeof raw==="string"?JSON.parse(raw):raw; }catch(e){ showMsg("The results sheet returned data in an unexpected format.","err"); return; }
+  if(!d){ showMsg("The results sheet returned no data. Press Refresh data to try again.","err"); return; }
+  if(d.error){ showMsg("Couldn't read the results sheet: "+esc(d.error),"err"); document.getElementById("loaded").textContent="error"; return; }
+  try{ init(d); }catch(e){ showMsg("Something went wrong while drawing the dashboard: "+esc(e.message),"err"); console.error(e); }
+}
+function init(d){
+  d.participants=d.participants||[]; d.attempts=d.attempts||[];
+  DATA=d;
+  LABEL={country:{},specialty:{},hospital:{}};
+  for(const k of ["country","specialty","hospital"]){
+    const tally={};
+    d.participants.forEach(p=>{const n=norm(p[k]); if(!n) return; tally[n]=tally[n]||{}; tally[n][p[k].trim()]=(tally[n][p[k].trim()]||0)+1;});
+    for(const n in tally) LABEL[k][n]=Object.entries(tally[n]).sort((a,b)=>b[1]-a[1])[0][0];
+    F[k]=new Set([...F[k]].filter(x=>x in LABEL[k]));
+  }
+  document.getElementById("loaded").textContent="updated "+new Date(d.loadedAt).toLocaleString();
+  render();
+}
+
+/* ---------- computation ---------- */
+function filteredParticipants(){
+  return DATA.participants.filter(p=>["country","specialty","hospital"].every(k=>!F[k].size||F[k].has(norm(p[k]))));
+}
+function chosenAttempts(pids){
+  const by={};
+  DATA.attempts.forEach(a=>{ if(!pids.has(a.pid)) return; const k=a.pid+"|"+a.set; const cur=by[k];
+    if(!cur || (F.basis==="first"?a.attempt<cur.attempt:a.attempt>cur.attempt)) by[k]=a; });
+  return Object.values(by);
+}
+function questionStats(atts){
+  const st={}; for(let q=1;q<=60;q++) st[q]={n:0,c:{},ok:0,by:{}};
+  atts.forEach(a=>{ const r=SETS[a.set]; if(!r) return;
+    for(let i=0;i<=r[1]-r[0];i++){ const q=r[0]+i, x=a.answers[i]||"none", s=st[q]; s.n++; s.c[x]=(s.c[x]||0)+1; if(KEY[q-1][0].includes(x)) s.ok++; } });
+  return st;
+}
+function entropy(c,n){ let h=0; for(const k in c){const p=c[k]/n; if(p>0) h-=p*Math.log2(p);} return h; }
+
+/* ---------- rendering ---------- */
+function render(){
+  const parts=filteredParticipants(), pids=new Set(parts.map(p=>p.pid)), atts=chosenAttempts(pids), qs=questionStats(atts);
+  const qList=Object.keys(qs).map(Number).filter(q=>F.set==="all"||setOf(q)===F.set);
+  const setScore=s=>{const l=atts.filter(a=>a.set===s); return l.length?{n:l.length,mean:l.reduce((x,a)=>x+a.score,0)/l.length,total:SETS[s][1]-SETS[s][0]+1}:null;};
+  const totN=qList.reduce((a,q)=>a+qs[q].n,0), totOk=qList.reduce((a,q)=>a+qs[q].ok,0);
+  const sorted=[...qList].sort((a,b)=>{
+    if(F.sort==="hard") return (qs[a].n?qs[a].ok/qs[a].n:2)-(qs[b].n?qs[b].ok/qs[b].n:2);
+    if(F.sort==="split") return (qs[b].n?entropy(qs[b].c,qs[b].n):-1)-(qs[a].n?entropy(qs[a].c,qs[a].n):-1);
+    return a-b; });
+  const active=["country","specialty","hospital"].flatMap(k=>[...F[k]].map(v=>`<span class="chip">${esc(LABEL[k][v])}</span>`));
+  document.getElementById("root").innerHTML=`<div class="layout">
+   <aside>
+     <div class="card" style="display:flex;flex-direction:column;gap:10px">
+       <div><p class="eyebrow">Question set</p><div class="seg" id="segSet">${["all","A","B","C","D"].map(s=>`<button data-v="${s}" class="${F.set===s?"on":""}">${s==="all"?"All 60":"Set "+s}</button>`).join("")}</div></div>
+       <div><p class="eyebrow">Which attempt</p><div class="seg" id="segBasis"><button data-v="first" class="${F.basis==="first"?"on":""}">First</button><button data-v="latest" class="${F.basis==="latest"?"on":""}">Latest</button></div></div>
+     </div>
+     ${["country","specialty","hospital"].map(k=>filterBox(k)).join("")}
+     <button class="linkbtn" id="clearAll">Clear all filters</button>
+   </aside>
+   <main>
+     <div class="card" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+       <div class="chips">${active.length?active.join(""):`<span class="muted small">No filters: showing all participants</span>`}</div>
+       <span class="small muted">${F.basis==="first"?"First attempt at each set (matches the group analysis)":"Most recent attempt at each set"}</span>
+     </div>
+     ${DATA.participants.length?"":`<div class="card" style="text-align:center;padding:22px"><h3>No responses yet</h3><p class="muted small" style="margin-top:6px">Results appear here as soon as participants submit their first set on uroflowmath-lab.github.io. Press <b>Refresh data</b> to check again.</p></div>`}
+     <div class="kpis">
+       <div class="card kpi"><p class="eyebrow">Participants</p><div class="v">${parts.length}<small> / ${DATA.participants.length}</small></div></div>
+       ${["A","B","C","D"].map(s=>{const x=setScore(s); return `<div class="card kpi"><p class="eyebrow">Set ${s} mean score</p><div class="v">${x?x.mean.toFixed(1):"—"}<small>${x?" / "+x.total:""}</small></div><p class="small muted">${x?x.n+" submitted":"no submissions"}</p></div>`;}).join("")}
+       <div class="card kpi"><p class="eyebrow">Overall agreement</p><div class="v">${totN?Math.round(totOk/totN*100)+"%":"—"}</div><p class="small muted">with expert reading</p></div>
+     </div>
+     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap">
+       <div><h2 style="font-size:19px">Answers by question</h2><div class="legend" style="margin-top:4px">${OPTS.concat(["none"]).map(o=>`<span><i style="background:var(--c-${o})"></i>${o==="none"?"No answer":o}</span>`).join("")}</div></div>
+       <label class="small">Sort <select id="sort" style="padding:4px;border-radius:6px;border:1px solid var(--line);background:var(--surface)">
+         <option value="q" ${F.sort==="q"?"selected":""}>Question number</option><option value="hard" ${F.sort==="hard"?"selected":""}>Lowest agreement first</option><option value="split" ${F.sort==="split"?"selected":""}>Most divided answers first</option></select></label>
+     </div>
+     <div class="tablewrap"><table>
+       <thead><tr><th>Q</th><th>Curve</th><th>Expert</th><th>n</th><th>Agree</th><th style="width:40%">Distribution</th></tr></thead>
+       <tbody>${sorted.map(q=>qRow(q,qs[q],parts,pids)).join("")||`<tr><td colspan="6" class="empty">No questions</td></tr>`}</tbody></table></div>
+     <div><h2 style="font-size:19px;margin-bottom:8px">Participants (${parts.length})</h2>
+     <div class="tablewrap" style="max-height:420px;overflow:auto"><table>
+       <thead><tr><th>Registered</th><th>Country</th><th>Specialty</th><th>Hospital</th><th>Name</th><th>Email</th><th>Set A</th><th>Set B</th><th>Set C</th><th>Set D</th></tr></thead>
+       <tbody>${parts.map(p=>{const sc=s=>{const a=atts.find(x=>x.pid===p.pid&&x.set===s);return a?a.score+"/"+a.total:"—"};
+         return `<tr><td class="small">${esc((p.registered||"").slice(0,10))}</td><td>${esc(p.country)}</td><td>${esc(p.specialty)}</td><td>${esc(p.hospital)}</td><td>${esc(p.name)}</td><td class="small">${esc(p.email)}</td><td class="n">${sc("A")}</td><td class="n">${sc("B")}</td><td class="n">${sc("C")}</td><td class="n">${sc("D")}</td></tr>`;}).join("")||`<tr><td colspan="10" class="empty">No participants match these filters</td></tr>`}</tbody></table></div></div>
+   </main></div>`;
+  wire();
+}
+function filterBox(k){
+  const counts={}; DATA.participants.forEach(p=>{const n=norm(p[k]); if(n) counts[n]=(counts[n]||0)+1;});
+  const items=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]||a.localeCompare(b)).filter(n=>!F.search[k]||n.includes(norm(F.search[k]))||F[k].has(n));
+  const title={country:"Country",specialty:"Specialty",hospital:"Hospital"}[k];
+  return `<div class="card flist"><div class="head"><p class="eyebrow">${title}${F[k].size?` · ${F[k].size} selected`:""}</p>${F[k].size?`<button class="linkbtn" data-clear="${k}">Clear</button>`:""}</div>
+    <input type="search" placeholder="Search ${title.toLowerCase()}" data-search="${k}" value="${esc(F.search[k])}">
+    <div class="opts">${items.map(n=>`<label><input type="checkbox" data-k="${k}" value="${esc(n)}" ${F[k].has(n)?"checked":""}><span title="${esc(LABEL[k][n])}">${esc(LABEL[k][n])}</span><em>${counts[n]}</em></label>`).join("")||`<span class="small muted" style="padding:4px">None</span>`}</div></div>`;
+}
+function stackBar(c,n){ return n?`<div class="stack">${OPTS.concat(["none"]).map(o=>c[o]?`<i style="width:${c[o]/n*100}%;background:var(--c-${o})" title="${o==="none"?"No answer":o}: ${c[o]} (${Math.round(c[o]/n*100)}%)"></i>`:"").join("")}</div>`:`<span class="muted small">No answers yet</span>`; }
+function pctCell(ok,n){ if(!n) return `<td class="n muted">—</td>`; const p=ok/n*100, col=p<50?"var(--bad)":p<75?"var(--warn)":"var(--ok)";
+  return `<td><div class="pct"><span class="num" style="font-size:17px;min-width:40px">${Math.round(p)}%</span><span class="bar"><i style="width:${p}%;background:${col}"></i></span></div></td>`; }
+function qRow(q,s,parts,pids){
+  const open=F.open===q;
+  let row=`<tr class="q ${open?"open":""}" data-q="${q}"><td class="n" style="font-size:20px"><b>${q}</b><div class="small muted" style="font-family:var(--f)">Set ${setOf(q)}</div></td>
+    <td><img class="thumb" src="${IMG(q)}" alt="" loading="lazy"></td>
+    <td><span class="ans">${KEY[q-1][0].join(" / ")}</span><div class="small muted">${esc(KEY[q-1][1])}</div></td>
+    <td class="n">${s.n}</td>${pctCell(s.ok,s.n)}<td>${stackBar(s.c,s.n)}</td></tr>`;
+  if(open) row+=`<tr class="detail"><td colspan="6">${detail(q,parts,pids)}</td></tr>`;
+  return row;
+}
+function detail(q,parts){
+  const set=setOf(q), r=SETS[set], i=q-r[0], k=F.breakdown, groups={};
+  const pmap=Object.fromEntries(parts.map(p=>[p.pid,p]));
+  chosenAttempts(new Set(parts.map(p=>p.pid))).filter(a=>a.set===set).forEach(a=>{
+    const g=norm(pmap[a.pid][k])||"(blank)", x=a.answers[i]||"none"; groups[g]=groups[g]||{n:0,ok:0,c:{}};
+    groups[g].n++; groups[g].c[x]=(groups[g].c[x]||0)+1; if(KEY[q-1][0].includes(x)) groups[g].ok++; });
+  const rows=Object.entries(groups).sort((a,b)=>b[1].n-a[1].n);
+  return `<div class="dgrid"><div><img src="${IMG(q)}" alt="Question ${q}"></div>
+    <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3>Question ${q} by group</h3>
+      <div class="seg" id="segBreak" style="min-width:240px">${["specialty","country","hospital"].map(b=>`<button data-v="${b}" class="${k===b?"on":""}">${b[0].toUpperCase()+b.slice(1)}</button>`).join("")}</div></div>
+      <div class="tablewrap"><table><thead><tr><th>${k}</th><th>n</th><th>Agree</th><th>Distribution</th></tr></thead><tbody>
+      ${rows.map(([g,v])=>`<tr><td>${esc(LABEL[k][g]||g)}</td><td class="n">${v.n}</td>${pctCell(v.ok,v.n)}<td>${stackBar(v.c,v.n)}</td></tr>`).join("")||`<tr><td colspan="4" class="empty">No answers yet</td></tr>`}
+      </tbody></table></div></div></div>`;
+}
+function wire(){
+  document.querySelectorAll("#segSet button").forEach(b=>b.onclick=()=>{F.set=b.dataset.v;render();});
+  document.querySelectorAll("#segBasis button").forEach(b=>b.onclick=()=>{F.basis=b.dataset.v;render();});
+  document.querySelectorAll("#segBreak button").forEach(b=>b.onclick=e=>{e.stopPropagation();F.breakdown=b.dataset.v;render();});
+  document.querySelectorAll("input[data-k]").forEach(c=>c.onchange=()=>{const s=F[c.dataset.k]; c.checked?s.add(c.value):s.delete(c.value); render();});
+  document.querySelectorAll("input[data-search]").forEach(inp=>inp.oninput=()=>{F.search[inp.dataset.search]=inp.value; const pos=inp.selectionStart, k=inp.dataset.search; render(); const n=document.querySelector(`input[data-search="${k}"]`); n.focus(); n.setSelectionRange(pos,pos);});
+  document.querySelectorAll("[data-clear]").forEach(b=>b.onclick=()=>{F[b.dataset.clear].clear();render();});
+  document.getElementById("clearAll").onclick=()=>{["country","specialty","hospital"].forEach(k=>{F[k].clear();F.search[k]="";});render();};
+  document.getElementById("sort").onchange=e=>{F.sort=e.target.value;render();};
+  document.querySelectorAll("tr.q").forEach(tr=>tr.onclick=()=>{const q=+tr.dataset.q; F.open=F.open===q?null:q; render();});
+}
+document.getElementById("refresh").onclick=load;
+document.getElementById("lock").onclick=()=>{try{localStorage.removeItem(PWKEY);}catch(e){} PW=""; DATA=null; gate();};
+load();
+</script>
+</body>
+</html>
