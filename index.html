@@ -178,6 +178,11 @@ body.quizmode .brand svg{width:34px;height:22px}
   .qnum{display:none}
 }
 .ritem .thumb,.subitem .thumb{object-fit:contain}
+.video{display:flex;gap:18px;align-items:center;padding:16px}
+.video img{flex:none;width:132px;height:132px;background:#fff;border-radius:6px;padding:4px;border:1px solid var(--line)}
+.video .vtext{display:flex;flex-direction:column;gap:8px;align-items:flex-start;min-width:0}
+.video .btn{text-decoration:none;font-size:15px;padding:8px 16px}
+@media (max-width:480px){.video{gap:12px;padding:12px}.video img{width:104px;height:104px}.video .btn{white-space:nowrap;font-size:14px;padding:7px 12px}}
 .zoom{position:fixed;inset:0;background:rgba(5,14,24,.92);z-index:50;display:grid;place-items:center;padding:12px;cursor:zoom-out}
 .zoom img{max-height:100%;max-width:100%;background:#fff;border-radius:6px}
 
@@ -211,6 +216,13 @@ body.quizmode .brand svg{width:34px;height:22px}
 const API = "https://script.google.com/macros/s/AKfycby2GYQ7isR-obyR2lbirHXNvB3c2ZbyX3j6tLxEHloxMll2S7U9vxq23egojTD-YBI_qA/exec";          // Google Apps Script web-app URL (…/exec). Leave empty to run offline.
 /* Purpose text shown on the welcome and home pages (replace with the final wording) */
 const PURPOSE = `This website accompanies the lecture interpreting uroflowmetry curves in pediatric population. It lets you revisit 60 uroflowmetry curves at your own pace, compare your reading with the expert reading. Your responses help us understand how curve interpretation varies between observers, specialties and countries.`;
+
+/* Related video (QR code on the welcome and home pages) */
+const VIDEO_URL = "https://www.youtube.com/watch?v=2f1YPphYdD8";
+const videoCard = () => `<div class="video card">
+  <img src="img/youtube-qr.svg" alt="QR code linking to the related video on YouTube" width="132" height="132">
+  <div class="vtext"><p class="eyebrow">Related video</p><p>Scan the QR code with your phone camera to watch the video on YouTube.</p>
+  <a class="btn ghost" href="${VIDEO_URL}" target="_blank" rel="noopener">Open on YouTube ↗</a></div></div>`;
 
 /* ===== Answer options ===== */
 const OPTS = [
@@ -332,6 +344,7 @@ function viewRegister(edit){
      <p>For each curve, choose the pattern that best describes it. Take as long as you need, move back and forth between questions, and review all your answers before you submit. After each set you will see the expert reading and how other participants classified the same curve.</p>
      <div class="legend">${OPTS.map(o=>`<span class="${o.cls}">${glyph(o)}${o.id==="Unclassifiable"?"Unclassifiable":o.id}</span>`).join("")}</div>
      <p class="muted small">Set A: questions 1–10 · Set B: 11–20 · Set C: 21–40 · Set D: 41–60. Only your first attempt at each set is used in the group analysis; you may retake any set.</p>
+     ${videoCard()}
    </div>
    <div class="card">
      <form id="regf" novalidate>
@@ -399,7 +412,8 @@ function viewHome(){
       return `<button class="mod" data-set="${s.id}"><span class="rng">${s.from}–${s.to}</span>
         <h3>${s.title} · ${s.sub}</h3><p class="small">${s.desc}</p><p class="muted small">${s.n} questions · self-paced</p>
         <span class="meta">${st.draft&&st.draft.id===s.id?`<span class="pill">In progress · ${st.draft.answers.filter(Boolean).length}/${s.n}</span><span>Continue →</span>`:f?`<span class="pill done">First attempt ${f.score}/${s.n}</span><span>${n>1?n+" attempts · ":""}Review →</span>`:`<span class="pill">Not started</span><span>Start →</span>`}</span></button>`;}).join("")}
-    </div></section>`;
+    </div>
+    <div style="max-width:560px">${videoCard()}</div></section>`;
   app.querySelectorAll("[data-set]").forEach(b=>b.onclick=()=>{const id=b.dataset.set; st.draft&&st.draft.id===id?startQuiz(id,true):firstOf(id)?viewReview(id):viewReady(id)});
   document.getElementById("torecord").onclick=viewRecord;
 }
