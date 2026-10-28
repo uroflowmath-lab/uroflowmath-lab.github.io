@@ -1,0 +1,1023 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>瓜島戰役動畫地圖</title>
+<meta name="description" content="以動畫地圖重現 1942–1943 年瓜達康納爾島戰役：登陸、薩沃島海戰、血嶺、韓德森機場之戰、瓜達康納爾海戰到日軍撤退。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b1b27'/%3E%3Cpath d='M6 20 C10 14 16 13 26 17 C20 21 12 23 6 20Z' fill='%23a3ae7f'/%3E%3Ccircle cx='16' cy='17' r='2.4' fill='%23ff6a5c'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;900&display=swap">
+<style>
+/* Layout: header on top; animated map (left) + chapter panel (right) on desktop, stacked on mobile.
+   The map is two layers: a world-space SVG (land, zones) driven by viewBox, and a screen-space SVG overlay
+   (units, arrows, labels) re-projected every frame so icons and text keep a constant pixel size. */
+:root{
+  --bg:#08141d; --panel:#0e1d29; --panel2:#132636; --ink:#ece5d1; --muted:#9db0bd; --line:#223646;
+  --us:#62b2ff; --us-dark:#123659; --jp:#ff6a5c; --jp-dark:#561812; --gold:#e3bd6a;
+  --land:#3c4935; --land-edge:#b7b388;
+  --f-body:"Noto Sans TC",system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  --f-head:"Noto Serif TC","Songti TC","PMingLiU",serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.65}
+button,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+[hidden]{display:none!important}
+
+.app{display:grid;height:100vh;height:100dvh;grid-template-columns:minmax(0,1fr) 390px;
+  grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"top top" "map panel" "ctrl panel"}
+.top{grid-area:top;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:10px 18px;border-bottom:1px solid var(--line);
+  padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right))}
+.top h1{margin:0;font-family:var(--f-head);font-weight:900;font-size:21px;letter-spacing:.06em}
+.top .sub{color:var(--muted);font-size:13px;letter-spacing:.04em}
+
+.mapwrap{grid-area:map;position:relative;overflow:hidden;min-height:0;
+  background:radial-gradient(ellipse 90% 80% at 55% 40%,#13384d 0%,#0b2333 55%,#071621 100%)}
+#world,#ov{position:absolute;inset:0;width:100%;height:100%;display:block}
+#world .land{fill:var(--land);stroke:var(--land-edge);stroke-width:1;vector-effect:non-scaling-stroke}
+#world .shoal{fill:none;stroke:rgba(120,196,220,.13);stroke-width:7;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+#world .hi{fill:rgba(0,0,0,.2)}
+#world .grat{stroke:rgba(160,200,220,.07);stroke-width:1;vector-effect:non-scaling-stroke;fill:none}
+#world .river{fill:none;stroke:#5f97b3;stroke-width:1.6;vector-effect:non-scaling-stroke;stroke-linecap:round}
+#world .ridge{fill:none;stroke:#d7b06a;stroke-width:4;vector-effect:non-scaling-stroke;stroke-linecap:round;opacity:.75}
+#world .contour{fill:none;stroke:rgba(215,200,150,.35);stroke-width:1;vector-effect:non-scaling-stroke}
+#world .zone{stroke-width:1.5;vector-effect:non-scaling-stroke;stroke-dasharray:5 4}
+#world .zone.us{fill:rgba(98,178,255,.16);stroke:rgba(140,200,255,.8)}
+#world .ring{fill:rgba(98,178,255,.05);stroke:rgba(140,200,255,.65);stroke-width:1.5;vector-effect:non-scaling-stroke;stroke-dasharray:7 6}
+#night{fill:#010712;pointer-events:none}
+
+#ov .t{font-family:var(--f-body);font-size:12px;font-weight:500;paint-order:stroke;stroke:#06121b;stroke-width:3.5px;stroke-linejoin:round;fill:var(--ink)}
+#ov .t.us{fill:#c3e2ff}
+#ov .t.jp{fill:#ffc4bc}
+#ov .t.place{fill:#e9e1c7;font-size:11.5px}
+#ov .t.isl{fill:#d9d3b1;font-size:13px;letter-spacing:.14em}
+#ov .t.big{font-size:15px;font-weight:700}
+#ov .t.sea{fill:#8db6cc;font-style:italic;font-size:12.5px;letter-spacing:.28em}
+#ov .t.wreck{fill:#a9b3bb;font-size:10.5px;font-weight:400}
+#ov .t.tag{font-size:12px;font-weight:700}
+#ov .t.alab{font-size:12.5px;font-weight:700}
+#ov .dot{fill:#e9e1c7;stroke:#06121b;stroke-width:1.2}
+.u .hull{stroke-width:.9}
+.u.us .hull{fill:var(--us);stroke:#071a2c}
+.u.jp .hull{fill:var(--jp);stroke:#2b0905}
+.u.sunk .hull{fill:#7d8790;stroke:#1a1f24}
+.u .troop{stroke-width:1.6}
+.u.us .troop{fill:var(--us-dark);stroke:var(--us)}
+.u.jp .troop{fill:var(--jp-dark);stroke:var(--jp)}
+.u .xmark{stroke:#ff3b2f;stroke-width:2.4;stroke-linecap:round;fill:none}
+.u .dmg{fill:#ffb347}
+.trail{fill:none;stroke-width:1.4;stroke-dasharray:2 4;opacity:.7}
+.trail.us{stroke:var(--us)} .trail.jp{stroke:var(--jp)}
+.arr .case{fill:none;stroke:#06121b;stroke-linecap:round;stroke-linejoin:round;opacity:.75}
+.arr .main{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.arr.us .main{stroke:var(--us)} .arr.jp .main{stroke:var(--jp)}
+.arr.us .head{fill:var(--us)} .arr.jp .head{fill:var(--jp)}
+.arr .head{stroke:#06121b;stroke-width:1.2}
+.fire line{stroke-linecap:round}
+.site .air{fill:#1c252c;stroke-width:1.6}
+.site.us .air,.site.us .base{stroke:var(--us)}
+.site.jp .air,.site.jp .base{stroke:var(--jp)}
+.site .base{fill:#1c252c;stroke-width:2}
+.site .core{stroke:none}
+.site.us .core{fill:var(--us)} .site.jp .core{fill:var(--jp)}
+
+/* HUD over the map */
+.hud{position:absolute;top:12px;right:14px;width:min(500px,calc(100% - 70px));display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
+.chip{display:inline-flex;align-items:center;gap:8px;background:rgba(6,16,24,.82);border:1px solid var(--line);border-radius:99px;
+  padding:4px 14px 4px 10px;font-weight:700;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.chip svg{width:16px;height:16px}
+.beat{max-width:100%;background:rgba(6,16,24,.82);border-left:3px solid var(--gold);border-radius:4px;padding:7px 12px;
+  font-size:14px;line-height:1.55}
+.beat b{display:block;color:var(--gold);font-size:12.5px;letter-spacing:.06em}
+.beat.flash{animation:beatIn .5s ease-out}
+@keyframes beatIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.legend{position:absolute;left:14px;bottom:12px;background:rgba(6,16,24,.85);border:1px solid var(--line);border-radius:8px;font-size:12.5px}
+.legend summary{cursor:pointer;padding:5px 12px;list-style:none;color:var(--muted);font-weight:700;letter-spacing:.08em}
+.legend summary::-webkit-details-marker{display:none}
+.legend ul{list-style:none;margin:0;padding:0 12px 9px;display:grid;grid-template-columns:auto auto;gap:4px 14px}
+.legend li{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.legend svg{width:30px;height:16px;flex:none}
+.scale{position:absolute;right:14px;bottom:14px;font-size:11.5px;color:var(--muted);text-align:center;pointer-events:none}
+.scale i{display:block;height:6px;border:1.5px solid var(--muted);border-top:0;margin-top:2px}
+.north{position:absolute;left:16px;top:14px;width:26px;height:38px;pointer-events:none;opacity:.8}
+
+.intro{position:absolute;inset:0;display:grid;place-items:center;padding:20px;background:rgba(4,11,17,.66);backdrop-filter:blur(2px)}
+.intro .card{max-width:520px;text-align:center;background:rgba(10,24,35,.92);border:1px solid var(--line);border-radius:14px;padding:28px 26px}
+.intro .eyebrow{color:var(--gold);letter-spacing:.24em;font-size:12px;font-weight:700}
+.intro h2{font-family:var(--f-head);font-weight:900;font-size:34px;margin:8px 0 6px;letter-spacing:.08em;text-wrap:balance}
+.intro p{color:var(--muted);margin:0 0 18px;text-wrap:balance}
+.btn{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:99px;padding:11px 24px;font-weight:700;letter-spacing:.06em;
+  background:var(--gold);color:#1a1205;cursor:pointer}
+.btn:hover{filter:brightness(1.08)}
+.btn svg{width:16px;height:16px}
+
+/* Controls */
+.ctrl{grid-area:ctrl;display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--line);background:var(--panel)}
+.ib{flex:none;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--panel2);display:grid;place-items:center;cursor:pointer}
+.ib:hover{border-color:var(--gold)}
+.ib svg{width:16px;height:16px;fill:var(--ink)}
+.ib.play{width:44px;height:44px;background:var(--gold);border-color:var(--gold)}
+.ib.play svg{fill:#1a1205}
+.track{position:relative;flex:1;min-width:80px;height:30px;cursor:pointer;touch-action:none}
+.segs{position:absolute;left:0;right:0;top:11px;height:8px;display:flex;gap:2px}
+.segs span{display:block;height:100%;border-radius:2px;opacity:.45}
+.segs span.on{opacity:1}
+.head{position:absolute;top:5px;width:3px;height:20px;margin-left:-1.5px;background:var(--ink);border-radius:2px;box-shadow:0 0 0 2px rgba(0,0,0,.5)}
+.tc{flex:none;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:86px;text-align:right}
+.ctrl select{flex:none;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 6px;font-size:13px}
+
+/* Panel */
+.panel{grid-area:panel;overflow:auto;background:var(--panel);border-left:1px solid var(--line);padding:20px 22px 28px;display:flex;flex-direction:column;gap:12px}
+.ph{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.16em;color:var(--gold);font-weight:700}
+.pdate{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.panel h2{margin:0;font-family:var(--f-head);font-weight:900;font-size:25px;line-height:1.3;letter-spacing:.04em;text-wrap:balance}
+.jpname{font-size:12.5px;color:var(--muted);margin-top:-6px}
+.pbody p{margin:0 0 .7em}
+.pbody b{color:#fff}
+.us-t{color:var(--us);font-weight:700}.jp-t{color:var(--jp);font-weight:700}
+.stats{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+.stats th,.stats td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}
+.stats th:first-child,.stats td:first-child{text-align:left;color:var(--muted);font-weight:500}
+.stats thead th{font-size:13px}
+.chap{border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
+.chap summary{cursor:pointer;font-weight:700;color:var(--muted);letter-spacing:.1em;font-size:13px}
+.chap ol{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:2px}
+.chap button{width:100%;display:grid;grid-template-columns:26px 1fr auto;gap:8px;align-items:baseline;text-align:left;background:none;border:0;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:14px}
+.chap button:hover{background:var(--panel2)}
+.chap button.on{background:var(--panel2);box-shadow:inset 3px 0 0 var(--gold)}
+.chap .n{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.chap .d{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.foot{font-size:12px;color:var(--muted);margin:0;border-top:1px solid var(--line);padding-top:10px}
+
+@media (max-width:900px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 60svh auto auto;grid-template-areas:"top" "map" "ctrl" "panel"}
+  .panel{border-left:0;overflow:visible;padding:18px 16px 40px}
+  .ctrl{position:sticky;bottom:0;z-index:5;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom))}
+  .tc{display:none}
+  .hud{left:12px;right:12px;width:auto;align-items:flex-start}
+  .beat{font-size:13px;padding:6px 10px}
+  .legend ul{grid-template-columns:auto}
+  .intro h2{font-size:28px}
+  .north{display:none}
+}
+@media (max-width:480px){
+  .ib{width:34px;height:34px}.ib.play{width:40px;height:40px}
+  .top h1{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>瓜達康納爾島戰役</h1>
+    <span class="sub">1942.8.7 – 1943.2.9 · 太平洋戰爭的轉捩點 · 動畫地圖</span>
+  </header>
+
+  <div class="mapwrap" id="mapwrap">
+    <svg id="world" aria-hidden="true">
+      <g id="wGrat"></g>
+      <g id="wLand"></g>
+      <g id="wLocal"></g>
+      <g id="wZones"></g>
+      <rect id="night" x="-3000" y="-3000" width="9000" height="9000" opacity="0"/>
+    </svg>
+    <svg id="ov" role="img" aria-label="瓜達康納爾島戰役動畫地圖">
+      <defs>
+        <radialGradient id="gBlast">
+          <stop offset="0" stop-color="#fffbe6"/>
+          <stop offset=".35" stop-color="#ffd166"/>
+          <stop offset=".7" stop-color="#ff7b2e" stop-opacity=".75"/>
+          <stop offset="1" stop-color="#ff4d1a" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <g id="oStatic"></g>
+      <g id="oWreck"></g>
+      <g id="oTrail"></g>
+      <g id="oArrow"></g>
+      <g id="oSite"></g>
+      <g id="oUnit"></g>
+      <g id="oFx"></g>
+      <g id="oText"></g>
+    </svg>
+
+    <div class="hud" aria-live="polite">
+      <div class="chip"><span id="dn"></span><span id="hudDate"></span></div>
+      <div class="beat" id="beat"><b id="beatWhen"></b><span id="beatText"></span></div>
+    </div>
+    <svg class="north" viewBox="0 0 26 38" aria-hidden="true"><path d="M13 2 L20 22 L13 18 L6 22Z" fill="#e9e1c7"/><text x="13" y="35" text-anchor="middle" font-size="11" fill="#e9e1c7" font-family="sans-serif" font-weight="700">N</text></svg>
+    <details class="legend" id="legend">
+      <summary>圖例</summary>
+      <ul>
+        <li><svg viewBox="0 0 30 16"><rect x="3" y="4" width="24" height="8" rx="2" fill="#62b2ff"/></svg>美軍／盟軍</li>
+        <li><svg viewBox="0 0 30 16"><rect x="3" y="4" width="24" height="8" rx="2" fill="#ff6a5c"/></svg>日軍</li>
+        <li><svg viewBox="0 0 30 16"><path d="M27 8 L22 5 L4 5 L4 11 L22 11Z" fill="#9fb0bd"/></svg>艦艇／艦隊</li>
+        <li><svg viewBox="0 0 30 16"><path d="M25 3 L5 3 L5 13 L25 13Z" fill="#9fb0bd"/></svg>航空母艦</li>
+        <li><svg viewBox="0 0 30 16"><g transform="translate(15 8) scale(.8)" fill="#9fb0bd"><path d="M9 0 L5 -1.2 L1.5 -8 L-0.5 -8 L0.5 -1.2 L-6 -1.2 L-8 -4.5 L-9 -4.5 L-8.2 0 L-9 4.5 L-8 4.5 L-6 1.2 L0.5 1.2 L-0.5 8 L1.5 8 L5 1.2Z"/></g></svg>飛機／攻擊隊</li>
+        <li><svg viewBox="0 0 30 16"><rect x="5" y="2" width="20" height="12" fill="#2a3540" stroke="#9fb0bd" stroke-width="1.5"/><path d="M5 2 L25 14 M25 2 L5 14" stroke="#9fb0bd" stroke-width="1.5"/></svg>地面部隊</li>
+        <li><svg viewBox="0 0 30 16"><rect x="2" y="2" width="26" height="12" fill="rgba(98,178,255,.2)" stroke="rgba(140,200,255,.8)" stroke-dasharray="3 2"/></svg>美軍防區</li>
+        <li><svg viewBox="0 0 30 16"><path d="M10 3 L20 13 M20 3 L10 13" stroke="#ff3b2f" stroke-width="2.4" stroke-linecap="round"/></svg>沉沒／潰滅</li>
+      </ul>
+    </details>
+    <div class="scale" id="scale"><span id="scaleTxt"></span><i id="scaleBar"></i></div>
+
+    <div class="intro" id="intro">
+      <div class="card">
+        <div class="eyebrow">1942 – 1943 · 所羅門群島</div>
+        <h2>瓜達康納爾島戰役</h2>
+        <p>從登陸、鐵底灣的夜戰、血嶺，到日軍趁夜撤離——用 17 個章節的動畫地圖，看完這場改變太平洋戰局的六個月。</p>
+        <button class="btn" id="startBtn"><svg viewBox="0 0 16 16"><path d="M4 2 L14 8 L4 14Z" fill="currentColor"/></svg>開始播放（約 4 分半）</button>
+        <p style="margin:14px 0 0;font-size:12.5px">可隨時暫停、拖曳時間軸或點選章節。空白鍵播放／暫停，← → 切換章節。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="ctrl">
+    <button class="ib" id="bPrev" aria-label="上一章"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="ib play" id="bPlay" aria-label="播放"><svg viewBox="0 0 16 16" id="playIco"><path d="M4 2 L14 8 L4 14Z"/></svg></button>
+    <button class="ib" id="bNext" aria-label="下一章"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <div class="track" id="track" role="slider" aria-label="時間軸" tabindex="0"><div class="segs" id="segs"></div><div class="head" id="head"></div></div>
+    <span class="tc" id="tc"></span>
+    <select id="speed" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>
+  </div>
+
+  <aside class="panel">
+    <div class="ph"><span class="eyebrow" id="pNum"></span><span class="pdate" id="pDate"></span></div>
+    <h2 id="pTitle"></h2>
+    <div class="jpname" id="pJp"></div>
+    <div class="pbody" id="pBody"></div>
+    <details class="chap" open><summary>章節</summary><ol id="chapList"></ol></details>
+    <p class="foot">地圖、航跡與部隊位置為示意，依常見史料整理；傷亡與兵力數字各來源略有出入，取常見數值。</p>
+  </aside>
+</div>
+
+<script>
+'use strict';
+/* ================= Geography =================
+   World units: x = (lon - 150) * 100, y = south latitude * 100 (1 unit ≈ 1.11 km). */
+const X = lon => (lon - 150) * 100, Y = s => s * 100;
+const PL = {
+  RABAUL:[152.18,4.20], SHORTLAND:[155.9,7.1], SANTO:[167.15,15.45],
+  HENDERSON:[160.055,9.428], LUNGA:[160.035,9.402], REDBEACH:[160.11,9.408], ILU:[160.078,9.41],
+  KOLI:[160.17,9.398], TAIVU:[160.28,9.37], TASIMBOKO:[160.235,9.38], MATANIKAU:[159.945,9.415],
+  KOKUMBONA:[159.865,9.375], TASSAFARONGA:[159.80,9.337], ESPERANCE:[159.70,9.245],
+  AUSTEN:[160.035,9.468], RIDGE:[160.062,9.452], TULAGI:[160.15,9.10], GAVUTU:[160.19,9.117], SAVO:[159.81,9.13]
+};
+const ISLANDS = [
+  {p:[[159.70,9.245],[159.75,9.29],[159.80,9.335],[159.84,9.36],[159.88,9.38],[159.92,9.398],[159.95,9.415],[159.99,9.42],[160.03,9.402],[160.08,9.41],[160.13,9.41],[160.17,9.398],[160.22,9.385],[160.28,9.37],[160.33,9.40],[160.40,9.44],[160.47,9.495],[160.53,9.53],[160.60,9.58],[160.67,9.63],[160.74,9.69],[160.80,9.745],[160.84,9.80],[160.85,9.86],[160.80,9.89],[160.70,9.90],[160.58,9.885],[160.45,9.855],[160.32,9.825],[160.20,9.795],[160.08,9.76],[159.97,9.71],[159.87,9.64],[159.78,9.56],[159.70,9.48],[159.64,9.41],[159.61,9.34],[159.625,9.29],[159.665,9.255]], hi:[[159.75,9.50],[159.95,9.55],[160.2,9.6],[160.45,9.68],[160.7,9.8],[160.6,9.86],[160.3,9.79],[160.0,9.70],[159.82,9.6]]},
+  {p:[[160.02,9.03],[160.08,8.98],[160.16,8.95],[160.27,8.94],[160.38,8.96],[160.45,9.02],[160.42,9.09],[160.32,9.12],[160.22,9.085],[160.12,9.08],[160.06,9.095],[160.025,9.07]]},
+  {e:[160.15,9.102,.025,.008]},{e:[160.19,9.117,.006,.005]},{e:[159.81,9.13,.035,.032]},{e:[159.12,9.06,.08,.05]},
+  {p:[[160.55,8.35],[160.75,8.40],[161.0,8.60],[161.25,8.85],[161.45,9.10],[161.55,9.40],[161.48,9.62],[161.30,9.55],[161.10,9.30],[160.90,9.10],[160.70,8.85],[160.58,8.60]]},
+  {p:[[158.20,7.40],[158.45,7.45],[158.80,7.65],[159.20,7.95],[159.55,8.20],[159.85,8.45],[159.85,8.60],[159.65,8.55],[159.30,8.35],[158.95,8.15],[158.60,7.95],[158.30,7.70],[158.15,7.55]]},
+  {p:[[156.45,6.65],[156.70,6.70],[157.10,6.90],[157.50,7.15],[157.85,7.40],[157.80,7.55],[157.45,7.40],[157.05,7.20],[156.70,7.00],[156.50,6.85]]},
+  {p:[[157.15,8.15],[157.45,8.10],[157.75,8.25],[157.95,8.45],[157.85,8.62],[157.55,8.55],[157.30,8.40],[157.10,8.30]]},
+  {e:[157.08,8.0,.12,.12]},
+  {p:[[156.55,7.70],[156.80,7.65],[156.95,7.85],[156.75,7.95],[156.55,7.88]]},
+  {p:[[158.0,8.6],[158.25,8.65],[158.2,8.75],[158.0,8.72]]},
+  {p:[[154.70,5.45],[155.05,5.50],[155.35,5.75],[155.65,6.10],[155.95,6.45],[156.05,6.75],[155.85,6.85],[155.55,6.75],[155.20,6.55],[154.95,6.25],[154.75,5.95],[154.65,5.70]]},
+  {p:[[154.60,5.05],[154.75,5.10],[154.80,5.40],[154.68,5.42],[154.58,5.25]]},
+  {e:[155.88,7.05,.08,.05]},
+  {p:[[148.35,5.50],[149.0,5.45],[149.6,5.35],[150.1,5.0],[150.3,5.4],[150.9,5.45],[151.4,5.05],[151.6,4.75],[151.95,4.35],[152.2,4.18],[152.4,4.3],[152.3,4.75],[151.95,5.0],[151.7,5.35],[151.5,5.6],[151.0,5.95],[150.5,6.2],[149.8,6.25],[149.2,6.15],[148.7,5.95],[148.35,5.75]]},
+  {p:[[150.6,2.6],[151.0,2.75],[151.6,3.1],[152.1,3.5],[152.5,3.9],[153.0,4.35],[153.25,4.75],[153.1,4.85],[152.7,4.6],[152.3,4.1],[151.8,3.55],[151.2,3.0],[150.75,2.8]]},
+  {p:[[161.25,10.20],[161.6,10.25],[162.0,10.45],[162.4,10.70],[162.35,10.85],[162.0,10.75],[161.6,10.58],[161.3,10.40]]},
+  {p:[[160.0,11.6],[160.5,11.65],[160.5,11.75],[160.05,11.72]]},
+  {p:[[165.75,10.62],[166.1,10.65],[166.1,10.8],[165.8,10.82]]},{e:[166.9,11.65,.1,.06]},
+  {p:[[166.6,14.65],[166.85,14.75],[167.0,15.0],[167.2,15.25],[167.15,15.55],[166.9,15.6],[166.65,15.4],[166.55,15.0]]},
+  {p:[[167.2,15.9],[167.5,16.1],[167.6,16.5],[167.3,16.55],[167.2,16.2]]},
+  {e:[152.8,9.1,.35,.08]},{e:[153.5,11.5,.35,.1]},
+  {p:[[143,3.4],[144.5,3.8],[145.8,5.0],[146.5,5.6],[147.8,6.0],[147.9,6.6],[147.0,6.8],[147.5,7.5],[148.3,8.5],[149.2,9.0],[149.8,9.6],[150.85,10.2],[150.5,10.6],[149.5,10.35],[148.5,10.15],[147.3,9.6],[146.5,8.8],[145.5,7.9],[144.3,7.6],[143,9],[141,9.2],[140.5,3]]}
+];
+const RIVERS = [
+  [[159.945,9.415],[159.948,9.43],[159.955,9.445],[159.952,9.46],[159.96,9.48],[159.97,9.50]],
+  [[160.035,9.402],[160.04,9.425],[160.05,9.445],[160.048,9.47],[160.055,9.50]],
+  [[160.078,9.41],[160.08,9.425],[160.085,9.44],[160.083,9.46]],
+  [[160.095,9.41],[160.10,9.43],[160.11,9.455],[160.115,9.48]]
+];
+// [text, lon, s, class, Lmin, Lmax, opts]  — L = camera width in world units
+const LABELS = [
+  ['新不列顛島',150.6,5.75,'isl',300,1e9],['新愛爾蘭島',151.95,3.62,'isl',300,1e9,{rot:38}],
+  ['布干維爾島',155.32,6.13,'isl',250,1e9,{rot:40}],['舒瓦瑟爾島',157.15,7.1,'isl',250,1e9,{rot:31}],
+  ['聖伊莎貝爾島',159.0,8.03,'isl',200,1e9,{rot:33}],['新喬治亞群島',157.55,8.86,'isl',200,1e9],
+  ['瓜達康納爾島',160.25,9.68,'isl big',90,1e9,{rot:20}],['馬來塔島',161.05,8.98,'isl',150,1e9,{rot:52}],
+  ['馬基拉島',161.85,10.62,'isl',200,1e9,{rot:28}],['倫內爾島',160.25,11.95,'isl',300,1e9],
+  ['聖克魯斯群島',166.0,10.4,'isl',300,1e9],['新幾內亞',147.6,8.0,'isl',300,1e9],
+  ['佛羅里達群島',160.23,9.015,'isl',35,1300],['薩沃島',159.81,9.13,'isl',25,900,{dy:20}],
+  ['所 羅 門 海',154.2,8.9,'sea',400,1e9],['珊 瑚 海',157.5,13.6,'sea',500,1e9],['太 平 洋',163.6,4.9,'sea',400,1e9],
+  ['「槽」新喬治亞海峽',157.8,7.92,'sea',200,1400,{rot:31}],['鐵 底 灣',159.98,9.25,'sea',30,260,{after:3}],
+  ['埃斯佩蘭斯角',159.70,9.245,'place',0,170,{dot:1,dx:-6,dy:-7,anchor:'end'}],
+  ['塔薩法隆格',159.80,9.337,'place',0,140,{dot:1,dx:-6,dy:14,anchor:'end'}],
+  ['科昆博納',159.865,9.375,'place',0,140,{dot:1,dx:-4,dy:16,anchor:'end'}],
+  ['馬塔尼考河',159.952,9.46,'place',0,140,{dx:-6,anchor:'end'}],
+  ['隆加角',160.035,9.402,'place',0,90,{dot:1,dx:0,dy:-9,anchor:'middle'}],
+  ['科利角',160.17,9.398,'place',0,140,{dot:1,dx:0,dy:-9,anchor:'middle'}],
+  ['泰武角',160.28,9.37,'place',0,140,{dot:1,dx:0,dy:-9,anchor:'middle'}],
+  ['伊盧河',160.084,9.452,'place',0,60,{dx:5}],['奧斯丁山',160.035,9.468,'place',0,110,{dx:0,dy:22,anchor:'middle'}],
+  ['血嶺',160.066,9.46,'place',0,80,{dx:8,dy:10}],['加夫圖',160.19,9.117,'place',0,60,{dx:7,dy:4}]
+];
+
+/* ================= Story ================= */
+const M=(id,side,kind,label,path,t0,t1,o={})=>({type:'move',id,side,kind,label,path,t0,t1,...o});
+const A=(side,path,t0,t1,o={})=>({type:'arrow',side,path,t0,t1,...o});
+const B=(at,t0,n,dur,o={})=>({type:'blast',at,t0,n,dur,...o});
+const F=(from,to,t0,t1,o={})=>({type:'fire',from,to,t0,t1,...o});
+const G=(text,at,t0,o={})=>({type:'tag',text,at,t0,...o});
+const R=(side,at,r,t0,o={})=>({type:'ring',side,at,r,t0,...o});
+const SLOT=[[155.95,7.15],[156.6,7.32],[157.3,7.65],[158.2,8.25],[159.0,8.72]];
+const rev=a=>a.slice().reverse();
+
+const CAM = {
+  WIDE:{cx:960,cy:985,w:1700,h:1300}, REGION:{cx:640,cy:690,w:1000,h:640}, SLOT:{cx:830,cy:820,w:760,h:520},
+  SLOT2:{cx:880,cy:840,w:440,h:300}, EASTSOL:{cx:1140,cy:730,w:600,h:500}, SCRUZ:{cx:1350,cy:900,w:950,h:640},
+  MIDSOL:{cx:1190,cy:1080,w:720,h:520}, EVAC:{cx:830,cy:830,w:620,h:420}, APPROACH:{cx:990,cy:930,w:150,h:95},
+  SOUND:{cx:1000,cy:922,w:84,h:54}, SOUNDW:{cx:978,cy:912,w:78,h:50}, LUNGAE:{cx:1013,cy:939,w:42,h:26},
+  LUNGAW:{cx:1000,cy:942,w:52,h:30}, GUADAL:{cx:995,cy:940,w:84,h:48}
+};
+const CAT = {pre:'#8a96a3', land:'#c2a35e', naval:'#5d9cc4', carrier:'#c9805e', supply:'#7f9d6e'};
+
+const SCENES = [
+{ short:'序章：為何是瓜島', date:'1942 年 5–7 月', cat:'pre', dur:14, cams:[[0,'WIDE',0]],
+  beats:[[0,'1942 年 5 月','日軍佔領圖拉吉，設立水上飛機基地'],[4,'1942 年 7 月','日軍開始在瓜島北岸的隆加平原修建機場'],[8,'威脅','機場一旦完工，陸基轟炸機可威脅美國通往澳洲的海上交通線'],[11,'1942 年 7 月','美軍決定搶先奪取瓜島——「瞭望台行動」']],
+  body:`<p>1942 年 6 月的中途島海戰後，日本海軍失去四艘主力航艦，但在西南太平洋仍握有主動權。5 月，日軍佔領所羅門群島的<b>圖拉吉</b>；7 月，又在對岸<b>瓜達康納爾島</b>北岸的隆加平原動工修建機場。</p><p>機場一旦完工，從這裡起飛的陸基轟炸機就能威脅新喀里多尼亞、斐濟與薩摩亞，進而切斷<b>美國通往澳洲的海上交通線</b>。</p><p>美軍決定搶在機場完工前出手。代號<b>「瞭望台行動」</b>（Operation Watchtower），這是太平洋戰爭中盟軍的第一場地面攻勢。</p>`,
+  events:[
+    A('jp',[[152.4,4.4],[154.7,6.3],[157.3,7.65],[159.6,9.0]],2,5,{w:5,label:'日軍南進',lo:[-10,-12],la:'end'}),
+    G('隆加機場（日軍施工中）','HENDERSON',5.2,{side:'jp',dx:16,dy:20}),
+    A('us',[[168.6,11.8],[164.5,14.4],[158,16.2],[151.5,16.8]],7,10,{w:4,dash:1,label:'美國—澳洲海上交通線',lo:[0,-12],la:'mid'}),
+    R('jp','HENDERSON',9.5,10,{label:'陸基轟炸機威脅範圍（示意）'})
+  ]},
+{ short:'登陸瓜島與圖拉吉', date:'1942 年 8 月 7–8 日', cat:'land', dur:16, cams:[[0,'APPROACH',2.5],[6,'SOUND',2],[10.5,'LUNGAE',2]],
+  beats:[[0,'8 月 7 日 清晨','登陸船團趁陰雨天未被發現，分兩路從薩沃島兩側駛入'],[5.4,'8 月 7 日 晨','艦砲與艦載機轟擊登陸海灘'],[6.5,'8 月 7 日 上午','陸戰隊在紅灘上岸，幾乎沒有遭遇抵抗；對岸的圖拉吉則爆發激戰'],[8.5,'8 月 7–8 日','島上約 2,800 名日軍（多為施工人員）撤入叢林'],[11.5,'8 月 8 日','美軍佔領機場，命名為「韓德森機場」']],
+  body:`<p>8 月 7 日，范德格里夫特少將指揮的<span class="us-t">美國陸戰第 1 師</span>分兩路登陸：約 <b>11,000 人</b>在瓜島「紅灘」上岸，島上約 2,800 名日軍（多為施工人員）倉皇撤入叢林；另約 3,000 人攻擊對岸的圖拉吉、加夫圖與塔納姆博戈，<span class="jp-t">日本守軍</span>頑強抵抗，幾乎全數戰死。</p><p>8 月 8 日，陸戰隊佔領了接近完工的機場，以中途島海戰中陣亡的陸戰隊飛行員洛夫頓·韓德森少校命名為<b>「韓德森機場」</b>。這座機場將成為接下來六個月雙方爭奪的核心。</p>`,
+  events:[
+    M('xray','us','convoy','登陸船團 X 隊（瓜島）',[[159.35,9.55],[159.52,9.30],[159.75,9.20],[159.95,9.30],[160.08,9.36],[160.11,9.385]],.5,6.2),
+    M('yoke','us','convoy','登陸船團 Y 隊（圖拉吉）',[[159.35,9.45],[159.55,9.12],[159.78,9.04],[159.95,9.11],[160.14,9.135]],.5,6.2,{lpos:'t'}),
+    B('REDBEACH',5.4,8,1.4,{spread:.012}),
+    A('us',[[160.11,9.388],[160.11,9.416]],6.6,7.4,{w:5,label:'紅灘登陸',lo:[8,14]}),
+    A('us',[[160.14,9.128],[160.15,9.11]],6.4,7.2,{w:4}),
+    B('TULAGI',7.2,12,3.5,{spread:.012}), B('GAVUTU',7.8,9,3,{spread:.006}),
+    A('us',[[160.11,9.416],[160.09,9.427],[160.066,9.43]],8,11,{w:5,label:'8/8 佔領機場',lo:[30,18],la:'mid'}),
+    A('jp',[[160.045,9.432],[160.0,9.436],[159.965,9.428],[159.94,9.414]],8.5,11.5,{w:3,dash:1,label:'日軍撤往馬塔尼考河以西',lo:[0,20],la:'mid'})
+  ]},
+{ short:'薩沃島海戰', jp:'日方稱：第一次所羅門海戰', date:'1942 年 8 月 8–9 日', cat:'naval', dur:20, cams:[[0,'REGION',2.5],[6.5,'SOUNDW',2.5]], night:[[6,18]],
+  beats:[[0,'8 月 8 日','三川軍一中將率 7 艘巡洋艦、1 艘驅逐艦自拉包爾南下'],[4,'8 月 8 日 晚','盟軍航艦已撤離；日艦隊沿「槽」高速衝向薩沃島'],[8,'8 月 9 日 凌晨','日艦從美軍雷達哨艦藍號附近通過，未被發現'],[9.6,'01:43','南方部隊遭奇襲：坎培拉號數分鐘內失去戰鬥力，芝加哥號艦艏中雷'],[11.6,'01:50','北方部隊遭兩路夾擊：文生斯號、昆西號、阿斯托利亞號相繼起火'],[15,'02:20 前後','三川擔心天亮遭空襲，未攻擊運輸船便撤退']],
+  body:`<p>登陸當晚，<span class="jp-t">三川軍一中將</span>率重巡洋艦群沿新喬治亞海峽——盟軍稱為<b>「槽」</b>（The Slot）——高速南下，趁夜突入薩沃島海域。盟軍的雷達哨艦沒有發現他們。</p><p>日艦以照明彈、精準砲擊和九三式魚雷，在約半小時內打垮兩支盟軍巡洋艦隊：美國重巡洋艦<b>文生斯號、昆西號、阿斯托利亞號</b>與澳洲的<b>坎培拉號</b>沉沒，盟軍約 1,077 人陣亡，日方幾乎無損。這是美國海軍史上最慘痛的海戰敗績之一。</p><p>三川顧慮天亮後遭美軍艦載機攻擊，沒有攻擊運輸船便撤退；但弗萊徹的航艦其實早已撤離，特納也只能在 9 日帶著卸下不到一半補給的運輸船離開。陸戰隊被獨自留在島上，靠繳獲的日軍米糧度日。這片海域此後被稱為<b>「鐵底灣」</b>。</p>`,
+  events:[
+    M('mk1','jp','fleet','三川艦隊（7 巡洋艦、1 驅逐艦）',[[152.4,4.4],[153.6,5.3],[154.7,6.4],[155.6,7.3],...SLOT.slice(1),[159.55,8.98]],.5,7,{out:7.2}),
+    M('mk2','jp','fleet','三川艦隊',[[159.55,8.98],[159.70,9.12],[159.80,9.19],[159.88,9.18],[159.93,9.12],[159.92,9.05],[159.82,9.00],[159.65,8.95],[159.45,8.88]],7,17.5,{show:7,lpos:'l'}),
+    M('blue','us','dd','藍號（雷達哨艦）',[[159.70,9.03],[159.62,9.07]],0,12,{show:6.6}),
+    M('canb','us','ca','坎培拉號（澳）',[[159.86,9.205],[159.835,9.215]],0,10.2,{show:6.6,lpos:'b'}),
+    M('chi','us','ca','芝加哥號',[[159.875,9.228],[159.84,9.245],[159.77,9.265]],0,15,{show:6.6,dmg:10.3,dmgText:'艦艏中雷',lpos:'b'}),
+    M('vin','us','ca','文生斯號',[[159.995,9.078],[159.985,9.068]],0,13,{show:6.6,sink:13.2}),
+    M('qui','us','ca','昆西號',[[159.98,9.093],[159.97,9.083]],0,12.8,{show:6.6,sink:12.9}),
+    M('ast','us','ca','阿斯托利亞號',[[159.965,9.108],[159.955,9.098]],0,15.5,{show:6.6,sink:15.6}),
+    F('mk2','canb',9.6,10.5), F('mk2','chi',9.9,10.4,{kind:'torp'}),
+    F('mk2','ast',11.6,13.6), F('mk2','qui',11.8,13), F('mk2','vin',12,13.2), F('qui','mk2',12.2,12.8)
+  ]},
+{ short:'仙人掌航空隊與特納魯河之戰', date:'1942 年 8 月 18–21 日', cat:'land', dur:16, cams:[[0,'LUNGAE',2.5]], night:[[0,3],[8.5,11]],
+  beats:[[0,'8 月 18 日 夜','6 艘驅逐艦在泰武角放下一木支隊先遣隊約 900 人'],[4.5,'8 月 20 日','首批 31 架陸戰隊戰機降落韓德森機場——「仙人掌航空隊」誕生'],[8.5,'8 月 21 日 凌晨','一木支隊向伊盧河口沙洲發起夜襲'],[11,'8 月 21 日 白天','陸戰隊渡河包抄，配合戰車掃蕩'],[13.6,'結果','一木支隊約 780 人陣亡，幾乎全軍覆沒；美軍陣亡約 40 餘人']],
+  body:`<p>日本大本營嚴重低估島上美軍兵力（估計僅約 2,000 人），只派出<span class="jp-t">一木清直大佐</span>的支隊先遣隊約 900 人，由驅逐艦連夜送到泰武角。</p><p>8 月 21 日凌晨，一木支隊沿海岸西進，在伊盧河口（美軍當時誤稱為特納魯河）的沙洲發起白刃衝鋒，在陸戰隊的機槍與砲火下傷亡慘重；天亮後陸戰隊渡河包抄，一木支隊幾乎全軍覆沒。</p><p>就在前一天，首批 31 架陸戰隊戰機進駐韓德森機場。以瓜島代號命名的<b>「仙人掌航空隊」</b>（Cactus Air Force）從此掌握白天的制空權。</p>`,
+  events:[
+    M('dd18','jp','dds','驅逐艦 6 艘',[[160.30,9.27],[160.285,9.345]],.3,2.6,{out:4}),
+    M('mar1','us','troop','陸戰第 1 團',[[160.073,9.418]],0,0,{show:1}),
+    M('ichiki','jp','troop','一木支隊先遣隊（約 900 人）',[[160.28,9.372],[160.22,9.394],[160.15,9.41],[160.095,9.418]],2.8,9,{kill:13.6,lpos:'t'}),
+    M('cactus','us','planes','仙人掌航空隊（31 架）',[[160.45,9.62],[160.2,9.5],[160.058,9.432]],4.5,7.5,{out:7.9}),
+    F('mar1','ichiki',9,12.5),
+    B([160.085,9.416],9,16,3.5,{spread:.006}),
+    A('us',[[160.07,9.426],[160.09,9.434],[160.112,9.427],[160.106,9.414]],11,13,{w:4,label:'渡河包抄',lo:[10,14]})
+  ]},
+{ short:'東所羅門海戰', jp:'日方稱：第二次所羅門海戰', date:'1942 年 8 月 24–25 日', cat:'carrier', dur:14, cams:[[0,'EASTSOL',3]],
+  beats:[[0,'8 月 24 日','日本航艦部隊南下，掩護田中賴三少將的增援船團'],[1.5,'下午','輕航艦龍驤號派機空襲韓德森機場'],[4,'下午','薩拉托加號的攻擊隊擊沉龍驤號'],[5.5,'傍晚','翔鶴、瑞鶴的艦載機以三枚炸彈命中企業號'],[9.5,'8 月 25 日 清晨','韓德森機場的轟炸機重創增援船團，船團被迫折返']],
+  body:`<p>日本海軍以航艦主力掩護增援船團南下，企圖一舉殲滅美軍航艦，並把部隊送上瓜島。雙方航艦在所羅門群島東方海域交手：美軍擊沉<span class="jp-t">輕航艦龍驤號</span>，擊落大量日機；<span class="us-t">企業號</span>被三枚炸彈命中，但損管成功、自力返航。</p><p>次日清晨，韓德森機場的陸戰隊轟炸機重創<b>田中賴三</b>的增援船團。日軍從此明白：在仙人掌航空隊的打擊範圍內，慢速運輸船白天無法靠近瓜島。</p>`,
+  events:[
+    M('kido','jp','cvf','機動部隊（翔鶴・瑞鶴）',[[162.0,5.3],[161.85,5.9]],0,12,{show:0}),
+    M('ryujo','jp','cv','龍驤號',[[161.1,5.6],[160.8,6.3]],0,6.6,{show:0,sink:6.8,lpos:'l'}),
+    M('sara','us','cvf','薩拉托加號',[[162.7,8.7],[162.55,8.4]],0,12,{show:0,lpos:'l'}),
+    M('ent','us','cvf','企業號',[[163.1,8.55],[162.95,8.25]],0,12,{show:0,dmg:8.5,dmgText:'中彈 3 枚'}),
+    M('rjs','jp','planes','龍驤號攻擊隊',[[160.8,6.4],[160.4,8.0],[160.06,9.40]],1.5,4.3,{out:4.6}),
+    B('HENDERSON',4.3,4,1),
+    M('ss','us','planes','薩拉托加號攻擊隊',[[162.5,8.3],[161.6,7.2],[160.85,6.35]],4,6.6,{out:7}),
+    M('ks','jp','planes','翔鶴・瑞鶴攻擊隊',[[161.8,6.0],[162.4,7.2],[162.95,8.2]],5.4,8.4,{out:8.8,lpos:'r'}),
+    B('ent',8.4,5,1.2,{spread:.05}),
+    M('tan1','jp','convoy','田中增援船團',[[158.9,5.6],[159.25,6.6],[159.55,7.45]],0,10,{show:0,out:10.7}),
+    M('hs','us','planes','韓德森機場的轟炸機',[[160.06,9.40],[159.8,8.4],[159.55,7.55]],9,10.7,{out:11}),
+    B([159.55,7.45],10.7,6,1.2,{spread:.06}),
+    M('tan1b','jp','convoy','增援船團（折返）',[[159.55,7.45],[159.3,6.8],[158.9,6.0]],11.4,14,{show:10.7,dmg:10.8})
+  ]},
+{ short:'東京快車', date:'1942 年 8 月底–9 月', cat:'supply', dur:16, cams:[[0,'SLOT',3]], night:[[3,9.6],[11,16]],
+  beats:[[0,'白天','韓德森機場的飛機掌控周邊海域，日軍運輸船無法靠近'],[3,'入夜','日軍驅逐艦從肖特蘭泊地出發，高速穿越「槽」'],[6.3,'午夜','搶灘卸下士兵與物資，立刻折返'],[8.5,'黎明前','在美機起飛前駛出打擊範圍'],[10.5,'日復一日','美軍稱之為「東京快車」，日軍自稱「鼠輸送」；大發動艇沿島嶼前進則稱「蟻輸送」']],
+  body:`<p>東所羅門海戰後，瓜島周邊形成一種奇特的平衡：<b>白天</b>，韓德森機場的仙人掌航空隊掌握周邊海空；<b>夜晚</b>，日本海軍的驅逐艦則主宰鐵底灣。</p><p>日軍改以高速驅逐艦在夜間穿越「槽」運送兵員，天亮前撤離——美軍戲稱為<b>「東京快車」</b>（Tokyo Express），日軍自稱<b>「鼠輸送」</b>；以大發動艇沿島嶼跳躍前進的則稱「蟻輸送」。<span class="jp-t">川口清健少將</span>的支隊就是這樣分批上島。</p><p>但驅逐艦載不了重砲與大量補給，島上日軍逐漸陷入飢餓。</p>`,
+  events:[
+    R('us','HENDERSON',2.7,.5,{label:'白天：仙人掌航空隊的打擊範圍（示意）'}),
+    M('raid','jp','planes','拉包爾出發的日間空襲',[[154.6,5.6],[157.5,7.4],[160.06,9.40]],.3,3,{out:3.3}),
+    M('tx1','jp','dds','驅逐艦（東京快車）',[...SLOT,[159.55,9.0],[159.85,9.24],[160.12,9.33],[160.26,9.35]],3,6.4,{out:6.8}),
+    M('tx1r','jp','dds','',rev([...SLOT,[159.55,9.0],[159.85,9.24],[160.12,9.33],[160.26,9.35]]),6.9,9.6,{show:6.8,out:10,trail:false}),
+    G('川口支隊登陸','TAIVU',6.4,{side:'jp',out:9.8,dx:14,dy:26}),
+    M('barge','jp','barges','大發動艇（蟻輸送）',[[157.9,8.6],[158.6,8.9],[159.1,9.13],[159.45,9.22],[159.62,9.28]],1,15,{lpos:'b'}),
+    M('tx2','jp','dds','驅逐艦（東京快車）',[...SLOT,[159.55,9.05],[159.76,9.27]],11,13.6,{out:14}),
+    M('tx2r','jp','dds','',rev([...SLOT,[159.55,9.05],[159.76,9.27]]),14.1,16,{show:14,trail:false}),
+    G('部隊上岸','TASSAFARONGA',13.6,{side:'jp',dx:-20,dy:28})
+  ]},
+{ short:'血嶺之戰', date:'1942 年 9 月 8–14 日', cat:'land', dur:18, cams:[[0,'LUNGAE',2]], night:[[9,15]],
+  beats:[[0,'9 月 8 日','埃德森的突擊營從海上奇襲泰辛博科，摧毀川口支隊的後方補給'],[3,'9 月上旬','川口清健少將率約 6,000 人在叢林中跋涉，繞到機場南方'],[9,'9 月 12 日 夜','日軍向機場南方的山脊發起第一波攻擊'],[12,'9 月 13 日 夜','主攻：日軍一度突破至機場邊緣，被砲兵與突擊營擊退'],[15,'9 月 14 日','川口支隊潰退，約 800 餘人陣亡；美軍陣亡約 100 人']],
+  body:`<p><span class="jp-t">川口支隊</span>約 6,000 人，主力由驅逐艦送到泰武角，在叢林中跋涉數日繞到機場南方，計畫與東、西兩側部隊同時夾擊。</p><p>機場南方一道長約 1 公里的草坡山脊，由<span class="us-t">梅里特·埃德森中校</span>的突擊營與傘兵營據守。9 月 12、13 日兩夜，日軍反覆衝鋒，一度逼近機場；陸戰隊退守山脊頂端，靠著密集砲火撐到天亮。</p><p>這道山脊從此被稱為<b>「血嶺」</b>或「埃德森嶺」。潰退的日軍翻越山地返回西側，沿途因飢餓與疾病大量倒下。</p>`,
+  events:[
+    A('us',[[160.10,9.392],[160.17,9.378],[160.232,9.373]],.5,2.4,{w:4,dash:1,label:'9/8 奇襲泰辛博科',lo:[0,-12],la:'mid'}),
+    B('TASIMBOKO',2.4,8,1.5,{spread:.004}),
+    M('edson','us','troop','埃德森突擊營・傘兵營',[[160.062,9.45]],0,0,{show:1,lpos:'l'}),
+    M('kawa','jp','troop','川口支隊主力',[[160.27,9.382],[160.23,9.42],[160.16,9.465],[160.10,9.485],[160.072,9.476]],3,9,{kill:15.4,lpos:'b'}),
+    M('kuma','jp','troop','熊大隊',[[160.16,9.412],[160.10,9.424]],5,10,{kill:15.4,lpos:'t'}),
+    M('oka','jp','troop','岡部隊',[[159.88,9.395],[159.93,9.432],[159.975,9.432]],5,11,{kill:15.4,lpos:'b'}),
+    A('jp',[[160.072,9.476],[160.065,9.459]],10,11,{w:5,label:'9/12 夜 第一波',lo:[12,6]}),
+    A('jp',[[160.077,9.479],[160.068,9.462],[160.059,9.445]],12,13.5,{w:6,label:'9/13 夜 主攻',lo:[14,0]}),
+    F('edson','kawa',10,14.5), F([160.045,9.42],[160.07,9.47],12,15,{kind:'arty',side:'us'}),
+    B([160.066,9.462],10,22,5,{spread:.008})
+  ]},
+{ short:'胡蜂號沉沒與雙方增兵', date:'1942 年 9 月 15–18 日', cat:'carrier', dur:12, cams:[[0,'MIDSOL',3]],
+  beats:[[0,'9 月 15 日','美軍航艦胡蜂號護送增援船團前往瓜島'],[3.4,'9 月 15 日 午後','日軍伊-19 潛艦一次齊射：胡蜂號被擊沉，戰艦北卡羅萊納號與驅逐艦奧布萊恩號也中雷'],[6,'9 月 18 日','陸戰第 7 團約 4,000 人與大批物資登岸'],[9,'9 月下旬起','日軍改派精銳的第 2 師團（仙台師團）上島']],
+  body:`<p>9 月 15 日，美軍航艦<span class="us-t">胡蜂號</span>在護航途中被日軍<span class="jp-t">伊-19 潛艦</span>擊沉——同一次魚雷齊射還擊傷了戰艦北卡羅萊納號與驅逐艦奧布萊恩號。此時薩拉托加號、企業號都在修理，美軍在南太平洋只剩<b>大黃蜂號</b>一艘可用的航艦。</p><p>即使如此，特納仍在 9 月 18 日把<b>陸戰第 7 團</b>約 4,000 人與大批物資送上瓜島。日本大本營也終於正視瓜島，決定投入第 2 師團（仙台師團）主力，並準備以戰艦砲擊壓制機場。</p>`,
+  events:[
+    M('wasp','us','cv','胡蜂號',[[164.7,12.95],[164.13,12.42]],0,4.2,{show:0,sink:4.3}),
+    M('i19','jp','sub','伊-19 潛艦',[[163.85,12.3],[163.95,12.36]],0,4,{show:1,lpos:'l'}),
+    F('i19','wasp',3.4,4.3,{kind:'torp'}),
+    M('conv7','us','convoy','陸戰第 7 團運輸船團',[[165.3,13.7],[163.4,11.9],[161.6,10.35],[160.95,9.75],[160.55,9.45],[160.2,9.36],[160.07,9.385]],4,11.5),
+    M('sendai','jp','dds','東京快車：第 2 師團登島',[[158.6,8.5],[159.3,8.9],[159.7,9.17],[159.82,9.3]],6,11,{lpos:'l'})
+  ]},
+{ short:'埃斯佩蘭斯角海戰', jp:'日方稱：薩沃島海戰', date:'1942 年 10 月 11–12 日', cat:'naval', dur:15, cams:[[0,'SOUNDW',3]], night:[[0,15]],
+  beats:[[0,'10 月 11 日 夜','城島船團運送重砲與部隊上島；五藤存知少將率巡洋艦隨後前來砲擊機場'],[5.5,'23:30 前後','美艦雷達發現日艦，日艦卻誤以為是己方船團'],[7.6,'23:46','斯科特艦隊橫在日艦航線前方，搶先開火'],[9,'午夜','古鷹號、吹雪號沉沒，五藤少將傷重不治；美驅逐艦鄧肯號沉沒'],[12,'結果','美軍在鐵底灣的第一次夜戰勝利——但日軍重砲已成功上岸']],
+  body:`<p>10 月 11 日夜，<span class="jp-t">五藤存知少將</span>率三艘重巡洋艦前來砲擊韓德森機場，同時掩護運送重砲與部隊的增援船團。美軍<span class="us-t">斯科特少將</span>的巡洋艦隊已在薩沃島西北埋伏。</p><p>日艦一度把美艦誤認為友軍，被美艦搶佔航線前方「T」字橫頭的有利位置。美軍擊沉重巡洋艦<b>古鷹號</b>與驅逐艦<b>吹雪號</b>，旗艦青葉號重創、五藤陣亡；美方損失驅逐艦鄧肯號。</p><p>這是美國海軍在鐵底灣的第一場夜戰勝利，不過日軍船團仍把重砲送上了瓜島。</p>`,
+  events:[
+    M('josh','jp','convoy','城島船團（重砲・部隊）',[[159.45,9.0],[159.6,9.14],[159.72,9.215],[159.79,9.305]],.3,5.5,{lpos:'l'}),
+    G('重砲上岸','TASSAFARONGA',5.6,{side:'jp',dx:16,dy:22}),
+    M('goto','jp','fleet','五藤艦隊（3 重巡、2 驅逐）',[[159.35,8.82],[159.55,8.93],[159.69,9.0]],.5,7.6,{out:7.8,lpos:'t'}),
+    M('goto2','jp','fleet','五藤艦隊（撤退）',[[159.69,9.0],[159.58,8.92],[159.35,8.8]],9.6,13.5,{show:7.8,dmg:7.9,dmgText:'青葉號重創',lpos:'t'}),
+    M('furu','jp','ca','古鷹號',[[159.69,9.008],[159.67,8.99]],7.8,10.4,{show:7.8,sink:10.5,lpos:'l'}),
+    M('fubu','jp','dd','吹雪號',[[159.705,9.02],[159.712,9.03]],7.8,8.8,{show:7.8,sink:8.9,lpos:'b'}),
+    M('scott','us','fleet','斯科特艦隊（4 巡洋、5 驅逐）',[[159.62,9.24],[159.73,9.10],[159.80,9.02],[159.78,8.99],[159.73,9.035],[159.68,9.09]],.5,12.5),
+    M('dunc','us','dd','鄧肯號',[[159.74,9.04],[159.77,9.065]],7.8,10.8,{show:7.6,sink:10.9}),
+    F('scott','goto',7.6,9.6), F('scott','furu',8,9.6), F('goto','dunc',8.2,9.2)
+  ]},
+{ short:'戰艦夜襲韓德森機場', date:'1942 年 10 月 13–15 日', cat:'naval', dur:14, cams:[[0,'SOUND',2],[4.5,'LUNGAE',2.5],[10,'LUNGAW',2]], night:[[0,10]],
+  beats:[[0,'10 月 13 日 深夜','戰艦金剛號與榛名號駛入鐵底灣'],[4,'10 月 14 日 01:30 前後','36 公分主砲開始轟擊韓德森機場'],[6.5,'約 80 分鐘','共發射 973 發砲彈：跑道受創、燃料幾乎燒光，90 架飛機中 48 架被毀'],[10,'10 月 15 日','日軍趁機以運輸船團在塔薩法隆格送上約 4,500 人']],
+  body:`<p>為掩護第 2 師團主力上島，日本海軍派出高速戰艦<span class="jp-t">金剛號與榛名號</span>。10 月 14 日凌晨，兩艦在鐵底灣以 36 公分主砲轟擊韓德森機場約 80 分鐘，發射 <b>973 發</b>砲彈。</p><p>跑道嚴重受創，航空燃料幾乎燒光，<b>90 架飛機中 48 架被毀</b>，41 人陣亡。陸戰隊員日後只稱它為<b>「那一夜」</b>（The Night）。</p><p>地勤人員連夜搶修，四處搜刮燃料，甚至從損毀的飛機油箱抽油，讓剩下的飛機繼續起飛。日軍則趁機以運輸船團送上約 4,500 人與大量物資。</p>`,
+  events:[
+    M('kongo','jp','bbf','金剛號・榛名號',[[159.55,8.95],[159.75,9.10],[159.92,9.24],[160.02,9.30],[160.12,9.305]],.3,9.5,{out:10.4,lpos:'t'}),
+    F('kongo',[160.055,9.43],4,10,{kind:'shell'}),
+    B('HENDERSON',4.2,46,6,{spread:.018,size:11}),
+    G('跑道受創・燃料焚毀',[160.06,9.436],8,{side:'us',dx:16,dy:26}),
+    M('conv15','jp','convoy','高速運輸船團（6 艘）',[[159.5,9.0],[159.68,9.2],[159.79,9.31]],10,13.4,{lpos:'l'}),
+    G('約 4,500 人上岸','TASSAFARONGA',13.2,{side:'jp',dx:-14,dy:26})
+  ]},
+{ short:'韓德森機場之戰', date:'1942 年 10 月 23–26 日', cat:'land', dur:18, cams:[[0,'LUNGAW',2]], night:[[8,16]],
+  beats:[[0,'10 月中旬','丸山政男中將率第 2 師團主力，沿叢林中開闢的「丸山道」繞向機場南方'],[6,'10 月 18 日','美方換將：海爾賽中將接任南太平洋戰區司令'],[8,'10 月 23 日 夜','住吉支隊與戰車在馬塔尼考河口提前出擊，遭砲火殲滅'],[10,'10 月 24–26 日','丸山主力在暴雨夜中反覆衝擊南面防線'],[13.5,'防守','普勒中校的陸戰營與陸軍第 164 步兵團死守；巴西隆中士以機槍整夜阻敵'],[16,'結果','日軍約 2,200–3,000 人陣亡，美軍陣亡約 80 餘人']],
+  body:`<p><span class="jp-t">第 2 師團</span>主力在叢林中開闢一條小徑（「丸山道」），企圖從防守薄弱的南面奇襲機場。但叢林行軍遠比預期艱難：重砲沿途丟棄，部隊疲憊不堪，攻擊日期一延再延，各部隊彼此失去聯繫。</p><p>10 月 23 日，西側的住吉支隊提前出擊，戰車在馬塔尼考河口被全數擊毀。24 至 26 日的雨夜，日軍主力向南面防線發起正面衝鋒，被<span class="us-t">普勒中校</span>的陸戰營、陸軍第 164 步兵團，以及約翰·巴西隆中士等人的機槍與砲火擊退。</p><p>這是日軍奪回機場的最後一次大規模地面攻勢。</p>`,
+  events:[
+    A('jp',[[159.875,9.392],[159.93,9.45],[159.99,9.485],[160.04,9.492],[160.062,9.487]],.5,6,{w:3,dash:1,label:'丸山道（叢林小徑）',lo:[0,18],la:'mid'}),
+    M('maru','jp','troop','第 2 師團主力（丸山）',[[159.875,9.392],[159.93,9.45],[159.99,9.485],[160.04,9.492],[160.055,9.488]],1,8,{kill:16.4,lpos:'b'}),
+    M('sumi','jp','troop','住吉支隊・戰車',[[159.895,9.40],[159.932,9.413]],5.5,8.4,{kill:9.8,lpos:'t'}),
+    B([159.94,9.414],8.3,10,1.8,{spread:.004}), F([159.975,9.425],'sumi',8.1,9.8,{kind:'arty',side:'us'}),
+    M('pul','us','troop','普勒營',[[160.045,9.459]],0,0,{show:1,lpos:'l'}),
+    M('a164','us','troop','陸軍第 164 步兵團',[[160.074,9.46]],0,0,{show:1}),
+    A('jp',[[160.04,9.487],[160.045,9.466]],10,11.5,{w:5,label:'10/24 夜',lo:[-14,4],la:'end'}),
+    A('jp',[[160.066,9.49],[160.07,9.468]],12.5,14,{w:5,label:'10/25 夜',lo:[12,8],la:'end'}),
+    F('pul','maru',10,15.4), F('a164','maru',12.5,15.4),
+    B([160.055,9.474],10,24,5.5,{spread:.01})
+  ]},
+{ short:'聖克魯斯群島海戰', jp:'日方稱：南太平洋海戰', date:'1942 年 10 月 26 日', cat:'carrier', dur:15, cams:[[0,'SCRUZ',3]],
+  beats:[[0,'10 月 26 日 清晨','雙方偵察機幾乎同時發現對方航艦'],[2,'上午','雙方攻擊隊在空中擦身而過'],[5,'上午','大黃蜂號被炸彈與魚雷命中、失去動力；翔鶴號、瑞鳳號被炸傷'],[7,'中午','企業號中彈，仍堅持回收飛機'],[10,'10 月 27 日','大黃蜂號棄艦後被日軍驅逐艦擊沉'],[12.5,'結果','日方戰術勝利，卻損失大批難以補充的資深飛行員']],
+  body:`<p>為配合陸軍的機場總攻，日本聯合艦隊出動四艘航艦南下。10 月 26 日，雙方在聖克魯斯群島北方展開航艦對決：美軍航艦<span class="us-t">大黃蜂號</span>沉沒、企業號受創，太平洋上一時只剩一艘受損的美軍航艦可以作戰。</p><p>日本贏得戰術勝利，但<span class="jp-t">翔鶴號與瑞鳳號</span>受創返國修理，更損失約 100 架飛機和大批資深飛行員——日本航艦部隊此後一年多無力再發動大規模航艦作戰。</p>`,
+  events:[
+    M('kidob','jp','cvf','機動部隊（翔鶴・瑞鶴・瑞鳳）',[[165.0,6.8],[165.3,7.4]],0,12,{show:0,dmg:5.6,dmgText:'翔鶴受創',lpos:'l'}),
+    M('junyo','jp','cv','隼鷹號',[[163.8,7.2],[164.2,7.6]],0,12,{show:0,lpos:'l'}),
+    M('hornet','us','cv','大黃蜂號',[[166.95,9.0],[166.75,8.68]],0,10.4,{show:0,dmg:4.9,dmgText:'失去動力',sink:10.5,lpos:'l'}),
+    M('ent3','us','cvf','企業號',[[167.25,8.85],[167.1,8.55]],0,12,{show:0,dmg:8,dmgText:'中彈受創'}),
+    M('js1','jp','planes','日軍攻擊隊',[[165.15,7.2],[166.1,8.0],[166.8,8.75]],1.8,4.8,{out:5.1,lpos:'t'}),
+    M('us1','us','planes','美軍攻擊隊',[[166.9,8.8],[166.0,7.9],[165.25,7.2]],2,5.4,{out:5.7,lpos:'b'}),
+    B('hornet',4.8,6,1.3,{spread:.06}), B('kidob',5.4,6,1.3,{spread:.06}),
+    M('js2','jp','planes','第二波',[[165.25,7.3],[166.3,8.1],[167.1,8.6]],6,8,{out:8.3,lpos:'t'}),
+    B('ent3',8,5,1.2,{spread:.05})
+  ]},
+{ short:'瓜達康納爾海戰', jp:'日方稱：第三次所羅門海戰', date:'1942 年 11 月 12–15 日', cat:'naval', dur:28, cams:[[0,'SOUND',2],[10.3,'SLOT2',2.5],[18,'SOUNDW',2.5]], night:[[0,10.3],[18.6,26.6]],
+  beats:[[0,'11 月 12 日 深夜','阿部弘毅中將率戰艦比叡號、霧島號前來砲擊機場'],[3.6,'11 月 13 日 01:50 前後','卡拉漢少將的艦隊迎頭撞上，雙方在極近距離陷入混戰'],[6.2,'約 40 分鐘','卡拉漢、斯科特兩位少將陣亡；亞特蘭大號等多艦沉沒，朱諾號隨後被潛艦擊沉'],[8.6,'11 月 13 日 白天','比叡號舵機受損，遭美機反覆攻擊後自沉——日本在二戰中損失的第一艘戰艦'],[10.5,'11 月 14 日 白天','田中賴三的 11 艘運輸船沿「槽」南下'],[11.8,'整個白天','韓德森機場與企業號的飛機輪番攻擊：7 艘運輸船沉沒，重巡洋艦衣笠號被擊沉'],[18.4,'11 月 14 日 深夜','近藤信竹中將率戰艦霧島號再度前來砲擊機場'],[20,'23:00 前後','威利斯·李少將的新銳戰艦華盛頓號、南達科他號已在等候'],[21.8,'混戰','美軍 3 艘驅逐艦沉沒，南達科他號電力故障、中彈數十發'],[23.2,'11 月 15 日 00:00 前後','華盛頓號以雷達射控在近距離連續命中霧島號'],[25.4,'11 月 15 日','霧島號沉沒；剩下 4 艘運輸船在塔薩法隆格擱淺卸貨，天亮後被炸毀']],
+  body:`<p>日軍準備以第 38 師團發動新攻勢：先用戰艦砲擊癱瘓機場，再以大型運輸船團一次送上部隊與重裝備。</p><p><b>11 月 13 日凌晨</b>，<span class="us-t">卡拉漢少將</span>以劣勢的巡洋艦隊在鐵底灣迎擊阿部的戰艦群，雙方近距離混戰。美方兩位少將陣亡、多艦沉沒，但砲擊被阻止，戰艦<span class="jp-t">比叡號</span>重傷後沉沒。</p><p><b>14 日白天</b>，美機擊沉田中船團 11 艘運輸船中的 7 艘。<b>當晚</b>，<span class="us-t">李少將</span>的戰艦華盛頓號以雷達射擊擊沉<span class="jp-t">霧島號</span>。</p><p>最後只有約 2,000–3,000 名士兵和極少物資上岸。日本此後再也沒有嘗試大規模增援瓜島，這場海戰被視為整場戰役的轉捩點。</p>`,
+  events:[
+    M('abe','jp','bbf','阿部艦隊（比叡・霧島）',[[159.45,8.88],[159.62,9.05],[159.75,9.20],[159.85,9.23],[159.91,9.235]],.3,5.2,{out:6,lpos:'t'}),
+    M('calla','us','fleet','卡拉漢艦隊（5 巡洋、8 驅逐）',[[160.12,9.33],[160.02,9.29],[159.965,9.255]],.3,5,{out:9.4,dmg:6.2,dmgText:'損失慘重',lpos:'b'}),
+    F('abe','calla',4.4,6.2), F('calla','abe',4.6,6.2),
+    B([159.94,9.245],4.6,26,4,{spread:.025,size:9}),
+    M('hiei','jp','bb','比叡號',[[159.91,9.235],[159.88,9.15],[159.85,9.06],[159.78,9.02]],6,10,{out:10.3,show:5.6,dmg:6,dmgText:'舵機受損',sink:10.1,lpos:'r'}),
+    F('calla','hiei',5.6,7.4),
+    M('atl','us','ca','亞特蘭大號',[[159.975,9.262],[160.0,9.32]],5,9.4,{out:10.3,show:5,dmg:5.6,sink:9.5,lpos:'r'}),
+    M('cush','us','dd','',[[159.935,9.236],[159.93,9.231]],5.2,6.4,{out:10.3,show:5.2,sink:6.5}),
+    M('laff','us','dd','',[[159.918,9.224],[159.914,9.22]],5.2,6.8,{out:10.3,show:5.2,sink:6.9}),
+    M('bart','us','dd','',[[159.95,9.242],[159.955,9.246]],5.2,5.8,{out:10.3,show:5.2,sink:5.9}),
+    M('mons','us','dd','',[[159.942,9.256],[159.946,9.26]],5.2,7.6,{out:10.3,show:5.2,sink:7.7}),
+    M('akat','jp','dd','',[[159.925,9.25],[159.93,9.255]],5.2,6.6,{out:10.3,show:5.2,sink:6.7}),
+    M('yuda','jp','dd','',[[159.958,9.224],[159.962,9.22]],5.2,7.8,{out:10.3,show:5.2,sink:7.9}),
+    M('tan2','jp','convoy','田中運輸船團（11 艘）',[[156.9,7.42],[157.6,7.9],[158.3,8.35],[158.85,8.7]],10.3,16.5,{out:18,relabel:[[15,'田中船團（僅剩 4 艘）']]}),
+    M('kinu','jp','ca','衣笠號',[[157.95,8.95],[157.8,8.85]],10.3,12.1,{show:10.3,sink:12.2,out:18,lpos:'b'}),
+    M('cap1','us','planes','韓德森機場攻擊隊',[[160.06,9.40],[159.2,8.9],[157.95,8.1]],11,12.6,{out:12.9}),
+    B('tan2',12.6,7,1.6,{spread:.06,size:10}),
+    M('ent4','us','planes','企業號攻擊隊',[[159.6,10.6],[159.0,9.4],[158.4,8.45]],13,14.6,{out:14.9}),
+    B('tan2',14.6,8,1.8,{spread:.06,size:10}),
+    M('kondo','jp','bbf','近藤艦隊（戰艦霧島）',[[159.45,8.86],[159.6,9.03],[159.72,9.17],[159.76,9.20]],18.6,22.6,{out:23.2,lpos:'l'}),
+    M('kiri','jp','bb','霧島號',[[159.76,9.20],[159.70,9.14],[159.66,9.08]],23.2,25,{show:22.8,dmg:23.4,dmgText:'連續中彈',sink:25.1,lpos:'l'}),
+    M('lee','us','bbf','李少將（華盛頓號・南達科他號）',[[159.62,8.92],[159.82,8.98],[159.895,9.07],[159.87,9.20],[159.82,9.25],[159.76,9.265]],18.6,25.5,{lpos:'r'}),
+    M('walk','us','dd','',[[159.845,9.236],[159.84,9.24]],21.6,22.3,{show:21.6,sink:22.4}),
+    M('pres','us','dd','',[[159.832,9.246],[159.828,9.25]],21.6,22.6,{show:21.6,sink:22.7}),
+    M('benh','us','dd','',[[159.855,9.226],[159.86,9.23]],21.6,24.4,{show:21.6,sink:24.5}),
+    G('南達科他號受創',[159.85,9.24],22.4,{side:'us',out:25.2,dx:18,dy:26}),
+    F('kondo','lee',21.6,23.2), F('lee','kondo',22.6,23.2), F('lee','kiri',23.2,24.8),
+    B([159.84,9.24],21.6,12,2,{spread:.015}), B('kiri',23.3,10,1.6,{spread:.008}),
+    M('tr4','jp','convoy','剩餘 4 艘運輸船',[[159.45,9.02],[159.62,9.17],[159.74,9.26],[159.80,9.322]],21,26,{sink:27,relabel:[[26.4,'擱淺的運輸船']],lpos:'l'}),
+    B('tr4',26.4,10,1.6,{spread:.008})
+  ]},
+{ short:'塔薩法隆格海戰', jp:'日方稱：隆加角夜戰', date:'1942 年 11 月 30 日', cat:'naval', dur:13, cams:[[0,'SOUNDW',2.5]], night:[[0,13]],
+  beats:[[0,'11 月 30 日 夜','田中賴三率 8 艘驅逐艦，運送裝滿補給的油桶前往塔薩法隆格'],[5.6,'23:20 前後','美艦雷達發現日艦，率先發射魚雷與砲擊，但魚雷全部落空'],[6.8,'反擊','日艦立刻轉向，射出數十枚九三式「長槍」魚雷'],[8.4,'數分鐘內','四艘美軍重巡洋艦中雷：北安普敦號沉沒，其餘三艘重創'],[10.6,'結果','戰術上日軍大勝，但補給桶幾乎沒有送上岸']],
+  body:`<p>為了在不靠岸的情況下補給島上饑餓的部隊，日軍把糧食與藥品裝進密封油桶，以繩索串連，由驅逐艦在夜間投放到海岸外，再由岸上部隊拖回。</p><p>11 月 30 日夜，<span class="us-t">萊特少將</span>的巡洋艦隊在塔薩法隆格外海以雷達截擊<span class="jp-t">田中賴三</span>的驅逐艦隊。美軍先發射的魚雷全部落空，田中的驅逐艦則冷靜反擊，以九三式魚雷擊沉重巡洋艦<b>北安普敦號</b>，重創明尼亞波利斯號、紐奧良號與彭薩科拉號，自身僅損失驅逐艦<b>高波號</b>。</p><p>這是日本驅逐艦夜戰的巔峰之作——但補給桶幾乎全數未能投放，島上的飢荒依舊。</p>`,
+  events:[
+    M('tan3','jp','dds','田中艦隊（8 驅逐艦・補給桶）',[[159.45,9.02],[159.62,9.17],[159.735,9.255],[159.80,9.315],[159.835,9.335]],.3,6.2,{out:8,lpos:'l'}),
+    M('tan3b','jp','dds','',[[159.835,9.335],[159.77,9.285],[159.66,9.2],[159.48,9.03]],8,12.5,{show:8}),
+    M('wright','us','fleet','萊特艦隊',[[160.08,9.17],[159.98,9.22],[159.90,9.26]],.3,6.6,{dmg:8.6,dmgText:'4 艦中雷',lpos:'t'}),
+    F('wright','tan3',5.8,7.4), F('wright','tan3',5.8,7.2,{kind:'torp'}),
+    M('taka','jp','dd','高波號',[[159.815,9.31],[159.81,9.305]],6.2,7.5,{show:6.2,sink:7.6,lpos:'b'}),
+    F('tan3','wright',6.8,8.6,{kind:'torp'}),
+    B('wright',8.4,8,1.5,{spread:.015}),
+    M('north','us','ca','北安普敦號',[[159.90,9.262],[159.89,9.252]],8.4,11,{show:8.4,sink:11.1,lpos:'b'})
+  ]},
+{ short:'餓島', date:'1942 年 12 月–1943 年 1 月', cat:'land', dur:16, cams:[[0,'GUADAL',2.5]],
+  beats:[[0,'12 月 9 日','奮戰四個月的陸戰第 1 師撤出休整，由陸軍帕奇少將接替指揮'],[2,'12 月–1 月','美軍攻擊奧斯丁山上的日軍「岐阜」陣地'],[4.5,'12 月 31 日','日本大本營決定放棄瓜島'],[6,'1943 年 1 月','美軍第 14 軍（陸軍第 25 師、陸戰第 2 師等）全面向西推進'],[11.5,'島上日軍','每天因飢餓、瘧疾與痢疾倒下的人，比戰死的更多']],
+  body:`<p>到了 12 月，島上日軍已陷入絕境：補給斷絕，士兵靠野草、樹根度日，瘧疾、痢疾與營養失調蔓延。日本兵把<b>「ガ島」</b>（瓜島）苦澀地改寫成諧音的<b>「餓島」</b>。</p><p>12 月 9 日，奮戰四個月的陸戰第 1 師撤出，由陸軍<span class="us-t">亞歷山大·帕奇少將</span>接手。12 月 31 日，日本大本營決定撤出瓜島。</p><p>1943 年 1 月，美軍第 14 軍攻下奧斯丁山的「岐阜」陣地與「奔馬」「海馬」等高地，1 月 23 日攻佔科昆博納，繼續向島的西北端推進。</p>`,
+  events:[
+    M('patch','us','troop','帕奇少將・第 14 軍',[[160.02,9.432]],0,0,{show:.5,lpos:'t'}),
+    M('gifu','jp','troop','岐阜陣地',[[160.03,9.474]],0,0,{show:1,kill:6.4,lpos:'l'}),
+    A('us',[[160.05,9.45],[160.036,9.468]],2,4,{w:4}),
+    A('us',[[160.01,9.452],[159.99,9.464],[159.972,9.468]],5.5,8,{w:4,label:'奔馬・海馬高地',lo:[-8,16],la:'end'}),
+    A('us',[[159.945,9.42],[159.90,9.40],[159.87,9.386]],8.5,12.5,{w:5,label:'1/23 攻佔科昆博納',lo:[10,-22],la:'mid'}),
+    M('jp17','jp','troop','第 17 軍殘部（飢餓與疾病）',[[159.92,9.44],[159.83,9.39]],7,14,{lpos:'b'})
+  ]},
+{ short:'撤退：ケ號作戰', date:'1943 年 2 月 1–9 日', cat:'supply', dur:16, cams:[[0,'EVAC',3]], night:[[2,6.6],[7,11.3],[11.6,15.4]],
+  beats:[[0,'1943 年 1 月底','日軍刻意增加航空與艦艇活動，美軍誤以為對方又要發動攻勢'],[2,'2 月 1 日 夜','第 1 次撤退：驅逐艦在埃斯佩蘭斯角接走 4,935 人'],[7,'2 月 4 日 夜','第 2 次撤退：3,921 人'],[11.6,'2 月 7 日 夜','第 3 次撤退：1,796 人'],[14.6,'2 月 9 日','帕奇：「東京快車在瓜達康納爾島已經沒有終點站了。」']],
+  body:`<p>日軍以<b>「ケ號作戰」</b>秘密撤退。撤退前，日軍刻意增加航空活動與艦艇調動，美軍誤以為對方又要發動新攻勢，因而採取守勢。</p><p>2 月 1、4、7 日三個夜晚，驅逐艦群高速駛抵瓜島西北端的埃斯佩蘭斯角，接走共 <b>10,652 名</b>骨瘦如柴的士兵。</p><p>2 月 9 日，美軍在島的西北端會師。帕奇少將向上級報告：「日軍在瓜達康納爾島已被徹底擊敗……『東京快車』在瓜達康納爾已經沒有終點站了。」</p>`,
+  events:[
+    M('ke1','jp','dds','撤退船隊（第 1 次）',[...SLOT,[159.45,9.0],[159.66,9.2]],2,4.2,{out:4.5}),
+    M('ke1r','jp','dds','',rev([...SLOT,[159.45,9.0],[159.66,9.2]]),4.6,6.6,{show:4.5,trail:false,out:6.8}),
+    G('4,935 人','ESPERANCE',4.2,{side:'jp',out:7,dx:-16,dy:30}),
+    M('ke2','jp','dds','撤退船隊（第 2 次）',[...SLOT,[159.45,9.0],[159.66,9.2]],7,9.1,{out:9.4}),
+    M('ke2r','jp','dds','',rev([...SLOT,[159.45,9.0],[159.66,9.2]]),9.5,11.3,{show:9.4,trail:false,out:11.5}),
+    G('3,921 人','ESPERANCE',9.1,{side:'jp',out:11.6,dx:-16,dy:30}),
+    M('ke3','jp','dds','撤退船隊（第 3 次）',[...SLOT,[159.45,9.0],[159.66,9.2]],11.6,13.4,{out:13.7}),
+    M('ke3r','jp','dds','',rev([...SLOT,[159.45,9.0],[159.66,9.2]]),13.8,15.6,{show:13.7,trail:false}),
+    G('1,796 人','ESPERANCE',13.4,{side:'jp',dx:-16,dy:30}),
+    A('us',[[159.87,9.38],[159.79,9.34],[159.73,9.272]],1,14.5,{w:4,label:'美軍向西推進',lo:[14,22],la:'end'})
+  ]},
+{ short:'結局', date:'1942.8.7 – 1943.2.9', cat:'pre', dur:16, cams:[[0,'SOUND',2.5],[7,'WIDE',3.5]],
+  beats:[[0,'鐵底灣','雙方數十艘艦船沉睡於薩沃島與瓜島之間的海底'],[6.5,'六個月','日軍陣亡約 19,200 人，盟軍約 7,100 人'],[9.5,'1943 年起','日本由攻轉守，盟軍開始沿所羅門群島北進，目標拉包爾'],[13.5,'','（完）']],
+  body:`<p>歷時六個月的瓜島戰役，雙方在陸、海、空投入了大量資源，最終以日本撤退告終。日軍陣亡者中，相當大一部分死於飢餓與疾病，而非戰鬥；美國海軍在鐵底灣的夜戰中也付出了極高代價。</p><table class="stats"><thead><tr><th></th><th class="us-t">盟軍</th><th class="jp-t">日本</th></tr></thead><tbody><tr><td>陣亡</td><td>約 7,100 人</td><td>約 19,200 人</td></tr><tr><td>被俘</td><td>4 人</td><td>約 1,000 人</td></tr><tr><td>艦艇沉沒</td><td>29 艘</td><td>38 艘</td></tr><tr><td>飛機損失</td><td>615 架</td><td>683–880 架</td></tr></tbody></table><p style="margin-top:.8em">瓜島與同時期的新幾內亞戰役，標誌著太平洋戰爭的<b>攻守易勢</b>：此後日本轉入防守，盟軍則沿所羅門群島與新幾內亞兩路向拉包爾推進，再一路跳島向日本本土逼近。</p>`,
+  events:[
+    A('us',[[160.0,9.15],[158.5,8.3],[156.6,7.2],[154.4,5.6],[152.7,4.55]],9.5,13,{w:6,dash:1,label:'1943 年起：盟軍沿所羅門群島北進',lo:[0,-16],la:'mid'})
+  ]}
+];
+
+/* ================= Engine ================= */
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const world = $('world'), ov = $('ov');
+function el(tag, attrs, parent){ const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const easeIO = p => p < .5 ? 4*p*p*p : 1 - Math.pow(-2*p + 2, 3) / 2;
+const easeS = p => -(Math.cos(Math.PI * p) - 1) / 2;
+const lerp = (a, b, t) => a + (b - a) * t;
+const f2 = n => Math.round(n * 100) / 100;
+const resolvePt = v => { const ll = typeof v === 'string' ? PL[v] : v; return [X(ll[0]), Y(ll[1])]; };
+function mulberry(a){ return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const hash = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+function catmull(pts, seg){
+  const n = pts.length, out = [], g = i => pts[Math.max(0, Math.min(n - 1, i))];
+  for (let i = 0; i < n - 1; i++){
+    const p0 = g(i-1), p1 = g(i), p2 = g(i+1), p3 = g(i+2);
+    for (let k = 0; k < seg; k++){
+      const t = k / seg, t2 = t*t, t3 = t2*t;
+      out.push([0,1].map(j => .5 * (2*p1[j] + (-p0[j] + p2[j])*t + (2*p0[j] - 5*p1[j] + 4*p2[j] - p3[j])*t2 + (-p0[j] + 3*p1[j] - 3*p2[j] + p3[j])*t3)));
+    }
+  }
+  out.push(pts[n-1]); return out;
+}
+function smoothClosed(p){
+  const n = p.length; let d = `M${f2(p[0][0])},${f2(p[0][1])}`;
+  for (let i = 0; i < n; i++){
+    const p0 = p[(i-1+n)%n], p1 = p[i], p2 = p[(i+1)%n], p3 = p[(i+2)%n];
+    d += `C${f2(p1[0]+(p2[0]-p0[0])/6)},${f2(p1[1]+(p2[1]-p0[1])/6)} ${f2(p2[0]-(p3[0]-p1[0])/6)},${f2(p2[1]-(p3[1]-p1[1])/6)} ${f2(p2[0])},${f2(p2[1])}`;
+  }
+  return d + 'Z';
+}
+function mkPath(list){
+  const pts = catmull(list.map(resolvePt), 10), cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i-1] + Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]));
+  return {pts, cum, len: cum[cum.length-1]};
+}
+function along(P, p){
+  const n = P.pts.length;
+  if (n === 1 || P.len === 0) return {x:P.pts[0][0], y:P.pts[0][1], a:0, i:0};
+  const d = clamp(p) * P.len; let lo = 0, hi = n - 1;
+  while (hi - lo > 1){ const m = (lo + hi) >> 1; if (P.cum[m] <= d) lo = m; else hi = m; }
+  const seg = P.cum[hi] - P.cum[lo] || 1, f = (d - P.cum[lo]) / seg, a = P.pts[lo], b = P.pts[hi];
+  return {x: lerp(a[0], b[0], f), y: lerp(a[1], b[1], f), a: Math.atan2(b[1]-a[1], b[0]-a[0]), i: lo};
+}
+function partial(P, p){ const r = along(P, p); return P.pts.slice(0, r.i + 1).concat([[r.x, r.y]]); }
+
+/* ---------- timeline ---------- */
+let acc = 0;
+SCENES.forEach((s, i) => { s.i = i; s.start = acc; acc += s.dur; s.units = {}; });
+const TOTAL = acc;
+const KEYS = [];
+SCENES.forEach(s => s.cams.forEach(([t, name, dur]) => KEYS.push({start: s.start + t, cam: CAM[name], dur})));
+const at = (si, t) => SCENES[si].start + t;
+const T_CAPTURE = at(1, 11.2), T_TULAGI = at(1, 10);
+
+function lerpCam(a, b, e){
+  const zoomy = Math.abs(Math.log(a.w / b.w)) > .5;
+  const w = Math.exp(lerp(Math.log(a.w), Math.log(b.w), e)), h = Math.exp(lerp(Math.log(a.h), Math.log(b.h), e));
+  const u = zoomy ? (a.w - w) / (a.w - b.w) : e; // keep the focus point steady on screen while zooming
+  return {cx: lerp(a.cx, b.cx, u), cy: lerp(a.cy, b.cy, u), w, h};
+}
+function camAt(T){
+  let k = 0; for (let i = 0; i < KEYS.length; i++){ if (KEYS[i].start <= T) k = i; else break; }
+  const key = KEYS[k], prev = k > 0 ? KEYS[k-1].cam : key.cam;
+  const p = key.dur ? clamp((T - key.start) / key.dur) : 1;
+  return lerpCam(prev, key.cam, easeIO(p));
+}
+const sceneAt = T => { for (let i = SCENES.length - 1; i >= 0; i--) if (T >= SCENES[i].start) return SCENES[i]; return SCENES[0]; };
+function nightAt(sc, lt){
+  let v = 0; for (const [a, b] of sc.night || []) v = Math.max(v, Math.min(clamp((lt - a) / .8), clamp((b - lt) / .8)));
+  return v;
+}
+const fadeWin = (lt, a, b, f) => lt < a ? 0 : Math.min(clamp((lt - a) / f), b === Infinity ? 1 : clamp(1 - (lt - b) / f));
+
+/* ---------- static world ---------- */
+(function buildWorld(){
+  const grat = $('wGrat'); let d = '';
+  for (let lon = 140; lon <= 172; lon++) d += `M${X(lon)},-200V2200`;
+  for (let s = 0; s <= 20; s++) d += `M-1200,${Y(s)}H2400`;
+  el('path', {d, class:'grat'}, grat);
+  const land = $('wLand');
+  ISLANDS.forEach(isl => {
+    if (isl.e){ const [lon, s, rx, ry] = isl.e; const a = {cx:X(lon), cy:Y(s), rx:rx*100, ry:ry*100};
+      el('ellipse', {...a, class:'shoal'}, land); el('ellipse', {...a, class:'land'}, land); return; }
+    const dd = smoothClosed(isl.p.map(resolvePt));
+    el('path', {d:dd, class:'shoal'}, land); el('path', {d:dd, class:'land'}, land);
+    if (isl.hi) el('path', {d:smoothClosed(isl.hi.map(resolvePt)), class:'hi'}, land);
+  });
+  const loc = $('wLocal');
+  RIVERS.forEach(r => el('polyline', {points: catmull(r.map(resolvePt), 6).map(p => p.map(f2).join(',')).join(' '), class:'river'}, loc));
+  const [ax, ay] = resolvePt('AUSTEN');
+  [[1.3,.85],[.8,.55],[.35,.25]].forEach(([rx, ry]) => el('ellipse', {cx:ax, cy:ay, rx, ry, class:'contour'}, loc));
+  el('polyline', {points: [[160.06,9.442],[160.062,9.45],[160.066,9.46]].map(resolvePt).map(p => p.join(',')).join(' '), class:'ridge'}, loc);
+})();
+const PERIM = [
+  {from:at(1,12.5), to:at(8,0), p:[[159.995,9.412],[160.035,9.402],[160.08,9.41],[160.088,9.44],[160.07,9.458],[160.04,9.462],[160.01,9.45],[159.99,9.432]]},
+  {from:at(8,0), to:at(14,0), p:[[159.945,9.415],[159.99,9.42],[160.03,9.402],[160.08,9.41],[160.10,9.412],[160.10,9.445],[160.08,9.465],[160.05,9.47],[160.01,9.465],[159.97,9.45],[159.95,9.435]]},
+  {from:at(14,0), to:TOTAL + 1, p:[[159.86,9.378],[159.92,9.398],[159.95,9.415],[159.99,9.42],[160.03,9.402],[160.08,9.41],[160.13,9.41],[160.17,9.398],[160.17,9.43],[160.10,9.46],[160.05,9.49],[160.0,9.495],[159.94,9.465],[159.88,9.42]]}
+];
+PERIM.forEach(z => z.el = el('path', {d:smoothClosed(z.p.map(resolvePt)), class:'zone us', opacity:0}, $('wZones')));
+
+/* ---------- static labels & sites (overlay) ---------- */
+const oStatic = $('oStatic'), oText = $('oText');
+const LBL = LABELS.map(([text, lon, s, cls, lo, hi, o = {}]) => {
+  const g = el('g', {}, oStatic);
+  const dot = o.dot ? el('circle', {r:2.6, class:'dot'}, g) : null;
+  const t = el('text', {class:'t ' + cls, 'text-anchor': o.anchor || 'middle', 'dominant-baseline':'middle'}, g);
+  t.textContent = text;
+  return {g, t, dot, p:resolvePt([lon, s]), lo, hi, o};
+});
+const SITES = [
+  {at:'RABAUL', kind:'base', side:() => 'jp', label:() => '拉包爾（日軍基地）', lo:250, hi:1e9},
+  {at:'SHORTLAND', kind:'base', side:() => 'jp', label:() => '肖特蘭泊地', lo:250, hi:1e9, small:1},
+  {at:'SANTO', kind:'base', side:() => 'us', label:() => '聖埃斯皮里圖島（美軍基地）', lo:300, hi:1e9, left:1},
+  {at:'TULAGI', kind:'base', side:T => T < T_TULAGI ? 'jp' : 'us', label:() => '圖拉吉', lo:0, hi:400, small:1},
+  {at:'HENDERSON', kind:'air', side:T => T < T_CAPTURE ? 'jp' : 'us', label:T => T < T_CAPTURE ? '隆加機場' : '韓德森機場', lo:0, hi:1e9, thi:450}
+];
+SITES.forEach(s => {
+  s.p = resolvePt(s.at); s.g = el('g', {class:'site'}, $('oSite'));
+  if (s.kind === 'air'){ el('rect', {x:-10, y:-3.5, width:20, height:7, rx:1.5, class:'air'}, s.g); el('rect', {x:-6, y:-.9, width:12, height:1.8, class:'core'}, s.g); }
+  else { const r = s.small ? 4 : 5.5; el('rect', {x:-r, y:-r, width:2*r, height:2*r, class:'base', transform:'rotate(45)'}, s.g); el('circle', {r:r*.45, class:'core'}, s.g); }
+  s.t = el('text', {class:'t place', 'dominant-baseline':'middle'}, oText);
+});
+
+/* ---------- dynamic events ---------- */
+const ICON = {
+  dd:'M7 0L3 -1.7L-6 -1.7L-6 1.7L3 1.7Z', ca:'M10 0L5 -2.5L-9 -2.5L-9 2.5L5 2.5Z', bb:'M13 0L7 -3.3L-12 -3.3L-12 3.3L7 3.3Z',
+  cv:'M12 -3.6L-12 -3.6L-12 3.6L12 3.6Z M3 -3.6L3 -6L-2 -6L-2 -3.6Z', tr:'M8 0L4 -2.8L-8 -2.8L-8 2.8L4 2.8Z',
+  sub:'M8 0C6 -1.8 -6 -1.8 -8 0C-6 1.8 6 1.8 8 0Z M1 -1.2L1 -3.4L-2 -3.4L-2 -1.2Z', barge:'M4 0L2 -1.4L-4 -1.4L-4 1.4L2 1.4Z',
+  plane:'M9 0L5 -1.2L1.5 -8L-0.5 -8L0.5 -1.2L-6 -1.2L-8 -4.5L-9 -4.5L-8.2 0L-9 4.5L-8 4.5L-6 1.2L0.5 1.2L-0.5 8L1.5 8L5 1.2Z'
+};
+const FORM = {
+  dds:[['dd',0,0],['dd',-13,0],['dd',-26,0]], fleet:[['ca',0,0],['ca',-20,0],['ca',-40,0],['dd',-56,0]],
+  bbf:[['bb',0,0],['bb',-27,0],['dd',12,-9],['dd',12,9]], cvf:[['cv',0,0],['dd',3,-11],['dd',3,11],['ca',-19,0]],
+  convoy:[['tr',0,-5],['tr',0,5],['tr',-18,-5],['tr',-18,5],['tr',-36,-5],['tr',-36,5]],
+  barges:[['barge',0,0],['barge',-10,-3.5],['barge',-20,1]], planes:[['plane',0,0],['plane',-12,-11],['plane',-12,11]]
+};
+const LPOS = {r:[15,1,'start'], l:[-15,1,'end'], t:[0,-15,'middle'], b:[0,18,'middle']};
+const oTrail = $('oTrail'), oArrow = $('oArrow'), oUnit = $('oUnit'), oFx = $('oFx'), oWreck = $('oWreck');
+const WRECKS = [];
+
+function build(ev, sc){
+  ev.els = []; const keep = e => (ev.els.push(e), e);
+  if (ev.type === 'move'){
+    sc.units[ev.id] = ev; ev.P = mkPath(ev.path);
+    ev.sinkT = ev.sink === true ? ev.t1 : ev.sink;
+    if (ev.trail === undefined) ev.trail = !['troop'].includes(ev.kind) && ev.P.len > 0;
+    if (ev.trail) ev.tr = keep(el('polyline', {class:'trail ' + ev.side}, oTrail));
+    ev.g = keep(el('g', {class:'u ' + ev.side}, oUnit));
+    ev.rot = el('g', {}, ev.g);
+    if (ev.kind === 'troop'){
+      el('rect', {x:-11, y:-7.5, width:22, height:15, class:'troop'}, ev.rot);
+      el('path', {d:'M-11 -7.5L11 7.5M11 -7.5L-11 7.5', class:'troop', fill:'none'}, ev.rot);
+    } else (FORM[ev.kind] || [[ev.kind, 0, 0]]).forEach(([ic, dx, dy]) => el('path', {d:ICON[ic], class:'hull', transform:`translate(${dx} ${dy})`}, ev.rot));
+    ev.dmgC = el('circle', {r:3, class:'dmg'}, ev.g);
+    ev.flash = el('circle', {r:0, fill:'url(#gBlast)'}, ev.g);
+    ev.xm = el('path', {d:'M-6 -6L6 6M6 -6L-6 6', class:'xmark'}, ev.g);
+    ev.lab = keep(el('text', {class:'t ' + ev.side}, oText));
+    if (ev.sinkT != null){
+      const end = along(ev.P, 1), w = {ev, sc, T:sc.start + ev.sinkT, x:end.x, y:end.y, a:end.a};
+      w.g = el('g', {class:'u sunk', opacity:.6}, oWreck); el('path', {d:ICON[ev.kind] || ICON.ca, class:'hull'}, w.g);
+      w.t = el('text', {class:'t wreck', 'text-anchor':'middle'}, oWreck); w.t.textContent = ev.label;
+      WRECKS.push(w);
+    }
+  } else if (ev.type === 'arrow'){
+    ev.P = mkPath(ev.path); ev.w = ev.w || 4;
+    ev.g = keep(el('g', {class:'arr ' + ev.side}, oArrow));
+    ev.c = el('polyline', {class:'case', 'stroke-width': ev.w + 3}, ev.g);
+    ev.m = el('polyline', {class:'main', 'stroke-width': ev.w}, ev.g);
+    if (ev.dash){ ev.c.setAttribute('stroke-dasharray', '9 6'); ev.m.setAttribute('stroke-dasharray', '9 6'); }
+    const s = Math.max(1, ev.w / 4.5);
+    ev.h = el('path', {d:`M${3*s} 0L${-10*s} ${-7*s}L${-7*s} 0L${-10*s} ${7*s}Z`, class:'head'}, ev.g);
+    if (ev.label){ ev.lab = keep(el('text', {class:'t alab ' + ev.side, 'text-anchor':'middle'}, oText)); ev.lab.textContent = ev.label; }
+  } else if (ev.type === 'blast'){
+    const rnd = mulberry(Math.round((ev.t0 + 1) * 1000) + sc.i * 7919); const sp = (ev.spread ?? .01) * 100;
+    ev.fl = Array.from({length: ev.n}, () => ({dt: rnd() * ev.dur, dx: (rnd()*2-1) * sp, dy: (rnd()*2-1) * sp, s: .6 + rnd() * .8}));
+    ev.g = keep(el('g', {}, oFx));
+    ev.fl.forEach(f => f.c = el('circle', {r:0, fill:'url(#gBlast)'}, ev.g));
+  } else if (ev.type === 'fire'){
+    ev.g = keep(el('g', {class:'fire'}, oFx));
+    ev.ln = [0,1,2].map(() => el('line', {}, ev.g));
+    ev.mz = el('circle', {r:3, fill:'#fff3c4'}, ev.g);
+  } else if (ev.type === 'tag'){
+    ev.g = keep(el('g', {}, oText));
+    ev.ld = el('line', {stroke:'#e9e1c7', 'stroke-width':1, opacity:.7}, ev.g);
+    ev.dt = el('circle', {r:3.2, class:'dot'}, ev.g);
+    ev.tx = el('text', {class:'t tag ' + (ev.side || ''), 'text-anchor': (ev.dx ?? 12) < 0 ? 'end' : 'start'}, ev.g);
+    ev.tx.textContent = ev.text;
+  } else if (ev.type === 'ring'){
+    const [cx, cy] = resolvePt(ev.at);
+    ev.c = keep(el('circle', {cx, cy, r: ev.r * 100, class:'ring'}, $('wZones')));
+    if (ev.side === 'jp') ev.c.setAttribute('style', 'fill:rgba(255,106,92,.05);stroke:rgba(255,140,128,.65)');
+    ev.lab = keep(el('text', {class:'t tag ' + ev.side, 'text-anchor':'middle'}, oText)); ev.lab.textContent = ev.label;
+    ev.top = [cx, cy - ev.r * 100];
+  }
+  ev.els.forEach(e => e.style.display = 'none');
+}
+SCENES.forEach(sc => sc.events.forEach(ev => build(ev, sc)));
+
+/* ---------- per-frame state ---------- */
+let VB = {x:0, y:0, z:1}, L = 1700, box = {w:800, h:600};
+const proj = (x, y) => [(x - VB.x) / VB.z, (y - VB.y) / VB.z];
+const ptsAttr = arr => arr.map(([x, y]) => { const p = proj(x, y); return f2(p[0]) + ',' + f2(p[1]); }).join(' ');
+const show = (e, on) => { e.style.display = on ? '' : 'none'; };
+function lvl(lo, hi){ return Math.min(clamp((L - lo * .75) / (lo * .25 + 1e-9)), clamp((hi * 1.3 - L) / (hi * .3))); }
+
+function unitAt(ev, lt){ return along(ev.P, easeS(clamp((lt - ev.t0) / Math.max(.001, ev.t1 - ev.t0)))); }
+function refPos(ref, sc, lt){
+  if (typeof ref === 'string' && sc.units[ref]){ const u = unitAt(sc.units[ref], lt); return [u.x, u.y]; }
+  return resolvePt(ref);
+}
+function sideOf(ref, sc, fallback){ return (typeof ref === 'string' && sc.units[ref]) ? sc.units[ref].side : fallback; }
+
+function updMove(ev, lt){
+  const vis0 = ev.show ?? (ev.t0 - .4), vis1 = ev.out ?? Infinity;
+  let op = fadeWin(lt, vis0, vis1, .4);
+  const on = op > 0; show(ev.g, on); show(ev.lab, on); if (ev.tr) show(ev.tr, on);
+  if (!on) return;
+  const st = unitAt(ev, lt), [sx, sy] = proj(st.x, st.y);
+  const sunk = ev.sinkT != null && lt >= ev.sinkT, killed = ev.kill != null && lt >= ev.kill;
+  if (sunk) op *= lt - ev.sinkT < 1.5 ? 1 : .7;
+  if (killed) op *= 1 - .6 * clamp((lt - ev.kill) / 1.5);
+  ev.g.setAttribute('opacity', op); ev.lab.setAttribute('opacity', op);
+  ev.g.classList.toggle('sunk', sunk);
+  const deg = ev.kind === 'troop' ? 0 : st.a * 180 / Math.PI;
+  ev.rot.setAttribute('transform', `translate(${f2(sx)} ${f2(sy)}) rotate(${f2(deg)})`);
+  show(ev.xm, sunk || killed); if (sunk || killed) ev.xm.setAttribute('transform', `translate(${f2(sx)} ${f2(sy)})`);
+  const hit = sunk ? lt - ev.sinkT : killed ? lt - ev.kill : -1;
+  show(ev.flash, hit >= 0 && hit < 1.1);
+  if (hit >= 0 && hit < 1.1) { ev.flash.setAttribute('cx', sx); ev.flash.setAttribute('cy', sy); ev.flash.setAttribute('r', 8 + hit * 22); ev.flash.setAttribute('opacity', 1 - hit / 1.1); }
+  const dmg = ev.dmg != null && lt >= ev.dmg && !sunk;
+  show(ev.dmgC, dmg);
+  if (dmg){ ev.dmgC.setAttribute('cx', sx - 3 + 2 * Math.sin(lt * 9)); ev.dmgC.setAttribute('cy', sy - 4); ev.dmgC.setAttribute('r', 2.6 + 1.4 * Math.abs(Math.sin(lt * 13))); }
+  let text = ev.label;
+  for (const [t, s] of ev.relabel || []) if (lt >= t) text = s;
+  if (text){
+    if (sunk) text += '（沉沒）'; else if (killed) text += '（潰滅）'; else if (dmg && ev.dmgText) text += '（' + ev.dmgText + '）';
+  }
+  if (ev.lab.textContent !== text) ev.lab.textContent = text;
+  const [dx, dy, anc] = LPOS[ev.lpos || 'r'];
+  ev.lab.setAttribute('x', f2(sx + dx)); ev.lab.setAttribute('y', f2(sy + dy)); ev.lab.setAttribute('text-anchor', anc);
+  if (ev.tr){
+    const p = easeS(clamp((lt - ev.t0) / Math.max(.001, ev.t1 - ev.t0)));
+    ev.tr.setAttribute('points', p > 0 ? ptsAttr(partial(ev.P, p)) : '');
+  }
+}
+function updArrow(ev, lt){
+  const op = fadeWin(lt, ev.t0, ev.out ?? Infinity, .5);
+  show(ev.g, op > 0); if (ev.lab) show(ev.lab, op > 0);
+  if (op <= 0) return;
+  const p = easeIO(clamp((lt - ev.t0) / (ev.t1 - ev.t0)));
+  const pts = partial(ev.P, p), s = ptsAttr(pts);
+  ev.c.setAttribute('points', s); ev.m.setAttribute('points', s); ev.g.setAttribute('opacity', op * .95);
+  const tip = along(ev.P, p), [tx, ty] = proj(tip.x, tip.y);
+  ev.h.setAttribute('transform', `translate(${f2(tx)} ${f2(ty)}) rotate(${f2(tip.a * 180 / Math.PI)})`);
+  if (ev.lab){
+    const ref = ev.la === 'mid' ? along(ev.P, .5) : ev.la === 'end' ? along(ev.P, 1) : tip;
+    const [lx, ly] = proj(ref.x, ref.y), lo = ev.lo || [0, -12];
+    ev.lab.setAttribute('x', f2(lx + lo[0])); ev.lab.setAttribute('y', f2(ly + lo[1]));
+    ev.lab.setAttribute('opacity', op * clamp((p - .4) / .4));
+  }
+}
+function updBlast(ev, sc, lt){
+  const on = lt >= ev.t0 && lt <= ev.t0 + ev.dur + 1; show(ev.g, on); if (!on) return;
+  const size = ev.size || 9;
+  ev.fl.forEach(f => {
+    const age = lt - ev.t0 - f.dt;
+    if (age < 0 || age > .8){ f.c.setAttribute('r', 0); return; }
+    const c = refPos(ev.at, sc, ev.t0 + f.dt), [x, y] = proj(c[0] + f.dx, c[1] + f.dy);
+    f.c.setAttribute('cx', f2(x)); f.c.setAttribute('cy', f2(y));
+    f.c.setAttribute('r', f2(size * f.s * (.5 + age * 1.8))); f.c.setAttribute('opacity', f2(1 - age / .8));
+  });
+}
+function updFire(ev, sc, lt){
+  const on = lt >= ev.t0 && lt <= ev.t1; show(ev.g, on); if (!on) return;
+  const side = sideOf(ev.from, sc, ev.side || 'us');
+  const a = refPos(ev.from, sc, lt), b = refPos(ev.to, sc, lt), [ax, ay] = proj(...a), [bx, by] = proj(...b);
+  const kind = ev.kind || 'gun', col = kind === 'torp' ? '#dff1ff' : side === 'us' ? '#a9dcff' : '#ffc27a';
+  const slot = Math.floor(lt * 11);
+  ev.ln.forEach((l, k) => {
+    const h = hash(slot * 3 + k + ev.t0 * 13), j1 = (hash(slot + k * 7) - .5) * 14, j2 = (hash(slot + k * 11 + 3) - .5) * 14;
+    l.setAttribute('x1', f2(ax + j1 * .4)); l.setAttribute('y1', f2(ay + j2 * .4)); l.setAttribute('x2', f2(bx + j1)); l.setAttribute('y2', f2(by + j2));
+    l.setAttribute('stroke', col);
+    if (kind === 'torp'){ l.setAttribute('stroke-width', 1.2); l.setAttribute('stroke-dasharray', '3 6'); l.setAttribute('stroke-dashoffset', f2(-lt * 30 - k * 3)); l.setAttribute('opacity', k === 2 ? 0 : .85); }
+    else if (kind === 'shell' || kind === 'arty'){ l.setAttribute('stroke-width', 1.6); l.setAttribute('stroke-dasharray', '2 10'); l.setAttribute('stroke-dashoffset', f2(-lt * 90 - k * 4)); l.setAttribute('opacity', .9); }
+    else { l.setAttribute('stroke-width', 1.4); l.removeAttribute('stroke-dasharray'); l.setAttribute('opacity', h > .45 ? .9 : 0); }
+  });
+  ev.mz.setAttribute('cx', f2(ax)); ev.mz.setAttribute('cy', f2(ay)); ev.mz.setAttribute('opacity', kind === 'torp' ? 0 : hash(slot + 99) > .5 ? .9 : .2);
+}
+function updTag(ev, lt){
+  const op = fadeWin(lt, ev.t0, ev.out ?? Infinity, .4); show(ev.g, op > 0); if (op <= 0) return;
+  const [x, y] = proj(...resolvePt(ev.at)), dx = ev.dx ?? 12, dy = ev.dy ?? -16;
+  ev.g.setAttribute('opacity', op);
+  ev.dt.setAttribute('cx', f2(x)); ev.dt.setAttribute('cy', f2(y));
+  ev.ld.setAttribute('x1', f2(x)); ev.ld.setAttribute('y1', f2(y)); ev.ld.setAttribute('x2', f2(x + dx)); ev.ld.setAttribute('y2', f2(y + dy - 4));
+  ev.tx.setAttribute('x', f2(x + dx + (dx < 0 ? -3 : 3))); ev.tx.setAttribute('y', f2(y + dy));
+}
+function updRing(ev, lt){
+  const op = fadeWin(lt, ev.t0, ev.out ?? Infinity, .8); show(ev.c, op > 0); show(ev.lab, op > 0); if (op <= 0) return;
+  ev.c.setAttribute('opacity', op);
+  const r = ev.r * 100 * clamp((lt - ev.t0) / 1.6 + .05);
+  ev.c.setAttribute('r', f2(easeIO(clamp(r / (ev.r * 100))) * ev.r * 100));
+  const [x, y] = proj(...ev.top); ev.lab.setAttribute('x', f2(x)); ev.lab.setAttribute('y', f2(y - 8)); ev.lab.setAttribute('opacity', op);
+}
+
+/* ---------- render ---------- */
+let T = 0, playing = false, speed = 1, cur = -1, curBeat = -1, dirty = true;
+const nightRect = $('night');
+
+function render(){
+  const sc = sceneAt(T), lt = T - sc.start;
+  if (sc.i !== cur) enterScene(sc);
+  const cam = camAt(T);
+  VB.z = Math.max(cam.w / box.w, cam.h / box.h);
+  VB.x = cam.cx - box.w * VB.z / 2; VB.y = cam.cy - box.h * VB.z / 2;
+  world.setAttribute('viewBox', `${f2(VB.x)} ${f2(VB.y)} ${f2(box.w * VB.z)} ${f2(box.h * VB.z)}`);
+  L = cam.w;
+
+  $('wLocal').setAttribute('opacity', f2(lvl(0, 120)));
+  PERIM.forEach(z => z.el.setAttribute('opacity', f2(Math.min(clamp((T - z.from) / .6), clamp((z.to - T) / .6)) * lvl(0, 260))));
+  const nf = nightAt(sc, lt);
+  nightRect.setAttribute('opacity', f2(nf * .5));
+  $('dn').innerHTML = nf > .5
+    ? '<svg viewBox="0 0 16 16"><path d="M10.5 2A6 6 0 1 0 14 12.5 5 5 0 0 1 10.5 2Z" fill="#cfd8e3"/></svg>'
+    : '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.4" fill="#ffd166"/><g stroke="#ffd166" stroke-width="1.5" stroke-linecap="round"><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6 13 13M3 13l1.4-1.4M11.6 4.4 13 3"/></g></svg>';
+
+  LBL.forEach(l => {
+    let op = lvl(l.lo, l.hi);
+    if (l.o.after != null && T < at(l.o.after, 0)) op = 0;
+    show(l.g, op > .01); if (op <= .01) return;
+    const [x, y] = proj(...l.p), dx = l.o.dx || 0, dy = l.o.dy || 0;
+    l.g.setAttribute('opacity', f2(op));
+    if (l.dot){ l.dot.setAttribute('cx', f2(x)); l.dot.setAttribute('cy', f2(y)); }
+    l.t.setAttribute('x', f2(x + dx)); l.t.setAttribute('y', f2(y + dy));
+    if (l.o.rot) l.t.setAttribute('transform', `rotate(${l.o.rot} ${f2(x + dx)} ${f2(y + dy)})`);
+  });
+  SITES.forEach(s => {
+    const [x, y] = proj(...s.p), side = s.side(T);
+    s.g.setAttribute('class', 'site ' + side); s.g.setAttribute('transform', `translate(${f2(x)} ${f2(y)})`);
+    const op = lvl(s.lo, s.hi), top = s.thi ? Math.min(op, lvl(0, s.thi)) : op; show(s.g, op > .01); show(s.t, top > .01);
+    s.g.setAttribute('opacity', f2(op)); s.t.setAttribute('opacity', f2(top));
+    const txt = s.label(T); if (s.t.textContent !== txt) s.t.textContent = txt;
+    s.t.setAttribute('x', f2(x + (s.left ? -12 : 14))); s.t.setAttribute('y', f2(y + (s.kind === 'air' ? -1 : 0))); s.t.setAttribute('text-anchor', s.left ? 'end' : 'start');
+  });
+  const finale = sc.i === SCENES.length - 1, wl = lvl(0, 240);
+  WRECKS.forEach(w => {
+    const on = T >= w.T && (sc.i !== w.sc.i || lt > (w.ev.out ?? Infinity)) && wl > .01;
+    show(w.g, on); show(w.t, on && finale && !!w.ev.label); if (!on) return;
+    const [x, y] = proj(w.x, w.y);
+    w.g.setAttribute('transform', `translate(${f2(x)} ${f2(y)}) rotate(${f2(w.a * 180 / Math.PI)})`); w.g.setAttribute('opacity', f2(.6 * wl));
+    w.t.setAttribute('x', f2(x)); w.t.setAttribute('y', f2(y + 13)); w.t.setAttribute('opacity', f2(.9 * wl));
+  });
+
+  sc.events.forEach(ev => {
+    if (ev.type === 'move') updMove(ev, lt); else if (ev.type === 'arrow') updArrow(ev, lt);
+    else if (ev.type === 'blast') updBlast(ev, sc, lt); else if (ev.type === 'fire') updFire(ev, sc, lt);
+    else if (ev.type === 'tag') updTag(ev, lt); else if (ev.type === 'ring') updRing(ev, lt);
+  });
+
+  let bi = -1; sc.beats.forEach((b, i) => { if (lt >= b[0]) bi = i; });
+  if (bi !== curBeat){
+    curBeat = bi; const b = sc.beats[Math.max(0, bi)], box2 = $('beat');
+    $('beatWhen').textContent = b[1]; $('beatText').textContent = b[2];
+    box2.classList.remove('flash'); void box2.offsetWidth; box2.classList.add('flash');
+  }
+  // scale bar
+  const kmPerPx = VB.z * 1.112, target = kmPerPx * 110;
+  const nice = [1,2,5,10,20,50,100,200,500,1000].find(n => n >= target * .55) || 1000;
+  $('scaleBar').style.width = f2(nice / kmPerPx) + 'px'; $('scaleTxt').textContent = nice + ' 公里';
+  // timeline
+  $('head').style.left = (T / TOTAL * 100) + '%';
+  $('tc').textContent = fmt(T) + ' / ' + fmt(TOTAL);
+  $('track').setAttribute('aria-valuenow', Math.round(T));
+}
+const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+
+function enterScene(sc){
+  if (cur >= 0) SCENES[cur].events.forEach(ev => ev.els.forEach(e => e.style.display = 'none'));
+  cur = sc.i; curBeat = -2;
+  $('pNum').textContent = `第 ${sc.i + 1} 章 ／ 共 ${SCENES.length} 章`;
+  $('pDate').textContent = sc.date; $('hudDate').textContent = sc.date;
+  $('pTitle').textContent = sc.short; $('pJp').textContent = sc.jp || ''; show($('pJp'), !!sc.jp);
+  $('pBody').innerHTML = sc.body;
+  document.querySelectorAll('#chapList button').forEach((b, i) => { b.classList.toggle('on', i === sc.i); if (i === sc.i) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
+  document.querySelectorAll('#segs span').forEach((s, i) => s.classList.toggle('on', i <= sc.i));
+}
+
+/* ---------- UI ---------- */
+const segs = $('segs'), list = $('chapList');
+SCENES.forEach(sc => {
+  const s = document.createElement('span'); s.style.flex = sc.dur; s.style.background = CAT[sc.cat]; s.title = sc.short; segs.appendChild(s);
+  const li = document.createElement('li'), b = document.createElement('button');
+  b.innerHTML = `<span class="n">${String(sc.i + 1).padStart(2, '0')}</span><span>${sc.short}</span><span class="d">${sc.date.replace(/ /g, '').replace('1942年', '').replace('1943年', '43/')}</span>`;
+  b.addEventListener('click', () => { seek(sc.start + .01); if (window.matchMedia('(max-width:900px)').matches) $('mapwrap').scrollIntoView({behavior:'smooth'}); });
+  li.appendChild(b); list.appendChild(li);
+});
+$('track').setAttribute('aria-valuemin', 0); $('track').setAttribute('aria-valuemax', Math.round(TOTAL));
+
+function seek(t){ T = clamp(t, 0, TOTAL); dirty = true; hideIntro(); }
+function setPlaying(p){
+  playing = p; if (p && T >= TOTAL - .05) T = 0;
+  $('playIco').innerHTML = p ? '<path d="M3 2h3.5v12H3zM9.5 2H13v12H9.5z"/>' : '<path d="M4 2 L14 8 L4 14Z"/>';
+  $('bPlay').setAttribute('aria-label', p ? '暫停' : '播放');
+  if (p) hideIntro();
+}
+function hideIntro(){ $('intro').hidden = true; }
+const chapterJump = d => { const i = clamp(sceneAt(T).i + d, 0, SCENES.length - 1); seek(SCENES[i].start + .01); };
+$('startBtn').addEventListener('click', () => setPlaying(true));
+$('bPlay').addEventListener('click', () => setPlaying(!playing));
+$('bPrev').addEventListener('click', () => { const sc = sceneAt(T); (T - sc.start > 2) ? seek(sc.start + .01) : chapterJump(-1); });
+$('bNext').addEventListener('click', () => chapterJump(1));
+$('speed').addEventListener('change', e => speed = +e.target.value);
+const track = $('track');
+const scrub = e => { const r = track.getBoundingClientRect(); seek((e.clientX - r.left) / r.width * TOTAL); };
+track.addEventListener('pointerdown', e => { track.setPointerCapture(e.pointerId); scrub(e); });
+track.addEventListener('pointermove', e => { if (track.hasPointerCapture(e.pointerId)) scrub(e); });
+track.addEventListener('keydown', e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){ e.preventDefault(); e.stopPropagation(); seek(T + (e.key === 'ArrowLeft' ? -5 : 5)); } });
+document.addEventListener('keydown', e => {
+  if (e.target.closest('select')) return;
+  if (e.code === 'Space' && !e.target.closest('button')){ e.preventDefault(); setPlaying(!playing); }
+  else if (e.key === 'ArrowRight') chapterJump(1);
+  else if (e.key === 'ArrowLeft') chapterJump(-1);
+});
+new ResizeObserver(() => { const r = $('mapwrap').getBoundingClientRect(); box = {w: Math.max(1, r.width), h: Math.max(1, r.height)}; dirty = true; }).observe($('mapwrap'));
+
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(.1, (now - last) / 1000); last = now;
+  if (playing){ T += dt * speed; dirty = true; if (T >= TOTAL){ T = TOTAL; setPlaying(false); } }
+  if (dirty){ dirty = false; render(); }
+  requestAnimationFrame(frame);
+}
+render();
+requestAnimationFrame(frame);
+window.__gc = {seek: t => { T = t; render(); }, scenes: SCENES, total: TOTAL};
+</script>
+</body>
+</html>
